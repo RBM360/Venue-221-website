@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manager | Venue 221</title>
+  <meta name="description" content="Venue 221 manager portal for protected booking calendar updates." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon-circle.svg" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a class="brand" href="./index.html">
+        <img src="./assets/Venue%20221%20logo%20transparent.png" alt="Venue 221 logo" />
+      </a>
+      <nav class="nav">
+        <a href="./index.html">Main Site</a>
+        <a href="./booking.html">Public Booking View</a>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle Menu">Menu</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="section-pad booking-hero">
+      <div class="container" data-reveal>
+        <p class="eyebrow">Manager</p>
+        <h1>Manage calendar bookings.</h1>
+        <p class="lead">This page is protected. Team members can create, edit, and delete booking statuses while the public page remains read-only.</p>
+      </div>
+    </section>
+
+    <section class="section-pad band">
+      <div class="container manager-shell" data-reveal>
+        <div id="manager-auth-panel" class="manager-card">
+          <p class="eyebrow">Manager Login</p>
+          <h2>Sign in to edit bookings</h2>
+          <form id="manager-login-form" class="form manager-form">
+            <label>Email
+              <input type="email" id="manager-email" placeholder="name@company.com" required />
+            </label>
+            <label>Password
+              <input type="password" id="manager-password" placeholder="Password" required />
+            </label>
+            <button type="submit" class="btn">Sign In</button>
+          </form>
+          <p id="manager-auth-message" class="muted manager-message"></p>
+        </div>
+
+        <div id="manager-app-panel" class="hidden">
+          <div class="manager-top manager-card">
+            <div>
+              <p class="eyebrow">Manager Session</p>
+              <h2>Booking Controls</h2>
+              <p id="manager-user" class="muted"></p>
+            </div>
+            <div class="btn-row">
+              <button type="button" id="manager-open-booking-modal" class="btn">Add Booking</button>
+              <button type="button" id="manager-signout" class="btn alt">Sign Out</button>
+            </div>
+          </div>
+
+          <div class="booking-wrap manager-calendar-wrap">
+            <div class="calendar-card">
+              <div class="calendar-controls">
+                <button class="btn alt calendar-nav" type="button" id="manager-prev-month">Prev</button>
+                <select id="manager-month" aria-label="Select Month"></select>
+                <select id="manager-year" aria-label="Select Year"></select>
+                <button class="btn alt calendar-nav" type="button" id="manager-next-month">Next</button>
+              </div>
+              <div class="calendar-weekdays">
+                <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+              </div>
+              <div id="manager-calendar-grid" class="calendar-grid"></div>
+            </div>
+
+            <aside class="booking-sidebar">
+              <p class="eyebrow">Selected Date</p>
+              <h2 id="manager-selected-date">Choose a date</h2>
+              <p class="muted">Click a date to edit availability.</p>
+
+              <div id="manager-block-status" class="booking-block-status">
+                <article class="block-card">
+                  <h3>Full Day</h3>
+                  <p class="muted">8:00 AM - 9:00 PM</p>
+                  <p class="status-pill status-available">Available</p>
+                </article>
+                <article class="block-card">
+                  <h3>Half Day AM</h3>
+                  <p class="muted">8:00 AM - 2:00 PM</p>
+                  <p class="status-pill status-available">Available</p>
+                </article>
+                <article class="block-card">
+                  <h3>Half Day PM</h3>
+                  <p class="muted">3:00 PM - 9:00 PM</p>
+                  <p class="status-pill status-available">Available</p>
+                </article>
+                <article class="block-card">
+                  <h3>Hourly</h3>
+                  <p class="muted">Call for available times</p>
+                  <p class="status-pill status-available">Available</p>
+                </article>
+              </div>
+              <div id="manager-slot-detail-panel" class="manager-slot-detail-panel muted">
+                Click a status card to view reservation details for that slot.
+              </div>
+            </aside>
+          </div>
+
+          <div class="manager-card manager-editor">
+            <p class="eyebrow">Edit Selected Date</p>
+            <form id="manager-booking-form" class="form manager-form">
+              <label>Date
+                <input type="date" id="manager-date" required />
+              </label>
+              <div class="manager-grid">
+                <label>Full Day
+                  <select id="manager-full-day">
+                    <option value="">None</option>
+                    <option value="unavailable" disabled>Unavailable (Auto)</option>
+                    <option value="available">Available</option>
+                    <option value="tentative">Tentative</option>
+                    <option value="booked">Booked</option>
+                  </select>
+                </label>
+                <label>Half Day AM
+                  <select id="manager-half-morning">
+                    <option value="">None</option>
+                    <option value="unavailable" disabled>Unavailable (Auto)</option>
+                    <option value="available">Available</option>
+                    <option value="tentative">Tentative</option>
+                    <option value="booked">Booked</option>
+                  </select>
+                </label>
+                <label>Half Day PM
+                  <select id="manager-half-evening">
+                    <option value="">None</option>
+                    <option value="unavailable" disabled>Unavailable (Auto)</option>
+                    <option value="available">Available</option>
+                    <option value="tentative">Tentative</option>
+                    <option value="booked">Booked</option>
+                  </select>
+                </label>
+              </div>
+              <div class="btn-row">
+                <button type="submit" class="btn">Save Date</button>
+                <button type="button" id="manager-refresh" class="btn alt">Reload Calendar</button>
+              </div>
+            </form>
+            <div id="manager-reservation-summary" class="manager-reservation-summary muted"></div>
+            <div id="manager-reservations-list" class="listing"></div>
+            <hr class="manager-divider" />
+            <p class="eyebrow">Custom Time Range</p>
+            <p class="muted">Apply one booked time range across multiple dates.</p>
+            <div class="manager-range-grid">
+              <label>Start Date
+                <input type="date" id="manager-range-start-date" />
+              </label>
+              <label>End Date
+                <input type="date" id="manager-range-end-date" />
+              </label>
+              <label>Start Time
+                <input type="time" id="manager-range-start-time" value="08:00" />
+              </label>
+              <label>End Time
+                <input type="time" id="manager-range-end-time" value="21:00" />
+              </label>
+            </div>
+            <div class="btn-row">
+              <button type="button" id="manager-apply-range" class="btn">Apply Custom Time Range</button>
+            </div>
+            <p id="manager-save-message" class="muted manager-message"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="manager-booking-modal" class="manager-modal hidden" aria-hidden="true">
+    <div class="manager-modal-backdrop" data-modal-close></div>
+    <div class="manager-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="manager-modal-title">
+      <div class="manager-modal-header">
+        <h3 id="manager-modal-title">Add Booking Details</h3>
+        <button type="button" id="manager-booking-modal-close" class="btn alt">Close</button>
+      </div>
+      <p class="muted">Selected date: <span id="manager-modal-date-label">-</span></p>
+      <div class="manager-contact-grid">
+        <label>Booking Slot
+          <select id="manager-reservation-slot">
+            <option value="">Select Slot</option>
+            <option value="full_day">Full Day (8:00 AM - 9:00 PM)</option>
+            <option value="half_morning">Half Day AM (8:00 AM - 2:00 PM)</option>
+            <option value="half_evening">Half Day PM (3:00 PM - 9:00 PM)</option>
+            <option value="custom">Custom Time Range</option>
+          </select>
+        </label>
+        <label>Custom Start Time
+          <input type="time" id="manager-reservation-start-time" value="08:00" />
+        </label>
+        <label>Custom End Time
+          <input type="time" id="manager-reservation-end-time" value="09:00" />
+        </label>
+        <label>Renter Name
+          <input type="text" id="manager-renter-name" placeholder="Full name" />
+        </label>
+        <label>Renter Email
+          <input type="email" id="manager-renter-email" placeholder="name@email.com" />
+        </label>
+        <label>Phone (Optional)
+          <input type="tel" id="manager-renter-phone" placeholder="Optional" />
+        </label>
+        <label>Event Type
+          <input type="text" id="manager-event-type" placeholder="Wedding, Shower, Corporate, etc." />
+        </label>
+        <label>Payment Status
+          <select id="manager-payment-status">
+            <option value="">Select Status</option>
+            <option value="paid_in_full">Paid In Full</option>
+            <option value="paid_down_payment">Paid Down Payment</option>
+            <option value="needs_payment">Needs Payment</option>
+          </select>
+        </label>
+      </div>
+      <label>Rental Agreement Link
+        <input type="url" id="manager-agreement-url" placeholder="https://..." />
+      </label>
+      <label>Rental Agreement File
+        <input type="file" id="manager-agreement-file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" />
+      </label>
+      <div class="btn-row">
+        <button type="button" id="manager-save-reservation" class="btn">Save Reservation Details</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./script.js"></script>
+  <script type="module" src="./manager.js"></script>
+</body>
+</html>

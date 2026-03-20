@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Booking | Venue 221</title>
+  <meta name="description" content="Check date and time-block availability for Venue 221. This draft booking view will be connected to a live calendar database." />
+  <meta name="supabase-url" content="" />
+  <meta name="supabase-anon-key" content="" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon-circle.svg" />
+</head>
+<body>
+  <header class="site-header"><div class="container nav-wrap"><a class="brand" href="./index.html"><img src="./assets/Venue%20221%20logo%20transparent.png" alt="Venue 221 logo" /></a><nav class="nav"><a href="./services.html">Events</a><a href="./packages.html">Packages</a><a href="./booking.html">Booking</a><a href="./contact.html">Contact</a></nav><button class="menu-toggle" aria-label="Toggle Menu">Menu</button></div></header>
+  <main>
+    <section class="section-pad booking-hero">
+      <div class="container" data-reveal>
+        <p class="eyebrow">Booking</p>
+        <h1>Check available dates and time blocks.</h1>
+        <p class="lead">This calendar is for availability visibility only. All reservations require a submitted application and team review before any date is confirmed.</p>
+        <div class="meta"><span>Location: 221 West Broad St, Cookeville, TN</span><span>Capacity: Up to 70 Guests</span></div>
+      </div>
+    </section>
+
+    <section class="section-pad band">
+      <div class="container booking-wrap" data-reveal>
+        <div class="calendar-card">
+          <div class="calendar-controls">
+            <button class="btn alt calendar-nav" type="button" id="booking-prev-month">Prev</button>
+            <select id="booking-month" aria-label="Select Month"></select>
+            <select id="booking-year" aria-label="Select Year"></select>
+            <button class="btn alt calendar-nav" type="button" id="booking-next-month">Next</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+          </div>
+          <div id="booking-calendar-grid" class="calendar-grid"></div>
+        </div>
+
+        <aside class="booking-sidebar">
+          <p class="eyebrow">Selected Date</p>
+          <h2 id="booking-selected-date">Choose a date</h2>
+          <p class="muted">Click a date to view booked and available blocks.</p>
+
+          <div id="booking-block-status" class="booking-block-status">
+            <article class="block-card">
+              <h3>Full Day</h3>
+              <p class="muted">8:00 AM - 9:00 PM</p>
+              <p class="status-pill status-available">Available</p>
+            </article>
+            <article class="block-card">
+              <h3>Half Day AM</h3>
+              <p class="muted">8:00 AM - 2:00 PM</p>
+              <p class="status-pill status-available">Available</p>
+            </article>
+            <article class="block-card">
+              <h3>Half Day PM</h3>
+              <p class="muted">3:00 PM - 9:00 PM</p>
+              <p class="status-pill status-available">Available</p>
+            </article>
+            <article class="block-card">
+              <h3>Hourly</h3>
+              <p class="muted">Call for available times</p>
+              <p class="status-pill status-available">Available</p>
+            </article>
+          </div>
+
+          <div class="listing booking-legend">
+            <a href="#"><strong>Available</strong><span>Open for booking request</span></a>
+            <a href="#"><strong>Tentative</strong><span>Inquiry in progress</span></a>
+            <a href="#"><strong>Booked</strong><span>Unavailable</span></a>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section-pad">
+      <div class="container" data-reveal>
+        <p class="eyebrow">Time Blocks</p>
+        <h2>Rental windows and booking rules</h2>
+        <div class="price-grid" data-stagger>
+          <article class="price-card">
+            <p class="eyebrow">Hourly</p>
+            <h3>Custom Hours</h3>
+            <p class="price">$125/hr</p>
+            <ul>
+              <li>3-hour minimum</li>
+              <li>4th hour complimentary after 3 booked hours</li>
+              <li>Call for available times</li>
+              <li>Hourly bookings cannot overlap both half-day sections</li>
+            </ul>
+          </article>
+          <article class="price-card">
+            <p class="eyebrow">Half Day</p>
+            <h3>Session Blocks</h3>
+            <p class="price">$600</p>
+            <ul>
+              <li>Morning: 8:00 AM - 2:00 PM</li>
+              <li>Evening: 3:00 PM - 9:00 PM</li>
+              <li>Exclusive use during selected session</li>
+            </ul>
+          </article>
+          <article class="price-card">
+            <p class="eyebrow">Full Day</p>
+            <h3>All Day Access</h3>
+            <p class="price">$1,100</p>
+            <ul>
+              <li>8:00 AM - 9:00 PM</li>
+              <li>Ideal for full-day events</li>
+              <li>Exclusive use of venue</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-pad band cta">
+      <div class="container" data-reveal>
+        <h2>Submit your event application for review.</h2>
+        <p class="muted">Submitting this form does not automatically book your date. Our team reviews each application and follows up with next steps.</p>
+      </div>
+    </section>
+
+    <section class="section-pad">
+      <div class="container" data-reveal>
+        <p class="eyebrow">Booking Application</p>
+        <h2>Apply using our renter application form</h2>
+        <p class="lead">All booking requests are reviewed before approval. Dates are not guaranteed until confirmed in writing by Venue 221.</p>
+        <div class="btn-row">
+          <a class="btn" href="https://docs.google.com/forms/d/e/1FAIpQLSf0BEDG2in75A553ZnzraFMhU_FxsxY7vhlnR2Rhy2LCdq5NQ/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Open Renter Application</a>
+          <a class="btn alt" href="./contact.html">Need something longer? Give us a call.</a>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="container footer-wrap"><div><p class="brand brand-footer"><img src="./assets/Venue%20221%20logo%20transparent.png" alt="Venue 221 logo" /></p><p class="muted">221 West Broad St, Cookeville, TN - conveniently located in downtown Cookeville.</p></div><div class="footer-links"><a href="./template-info/style-guide.html">Style Guide</a><a href="./template-info/licenses.html">Licenses</a><a href="./template-info/changelog.html">Changelog</a></div></div></footer>
+  <script type="module" src="./script.js"></script>
+</body>
+</html>
+
+

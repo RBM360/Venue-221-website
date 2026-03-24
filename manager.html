@@ -26,14 +26,6 @@
   </header>
 
   <main>
-    <section class="section-pad booking-hero">
-      <div class="container" data-reveal>
-        <p class="eyebrow">Manager</p>
-        <h1>Manage calendar bookings.</h1>
-        <p class="lead">This page is protected. Team members can create, edit, and delete booking statuses while the public page remains read-only.</p>
-      </div>
-    </section>
-
     <section class="section-pad band">
       <div class="container manager-shell" data-reveal>
         <div id="manager-auth-panel" class="manager-card">
@@ -82,6 +74,10 @@
               <p class="eyebrow">Selected Date</p>
               <h2 id="manager-selected-date">Choose a date</h2>
               <p class="muted">Click a date to edit availability.</p>
+              <div class="manager-date-actions">
+                <button type="button" id="manager-mark-date-unavailable" class="btn alt">Mark Date Unavailable</button>
+                <button type="button" id="manager-mark-date-available" class="btn alt">Mark Date Available</button>
+              </div>
 
               <div id="manager-block-status" class="booking-block-status">
                 <article class="block-card">
@@ -99,82 +95,11 @@
                   <p class="muted">3:00 PM - 9:00 PM</p>
                   <p class="status-pill status-available">Available</p>
                 </article>
-                <article class="block-card">
-                  <h3>Hourly</h3>
-                  <p class="muted">Call for available times</p>
-                  <p class="status-pill status-available">Available</p>
-                </article>
-              </div>
-              <div id="manager-slot-detail-panel" class="manager-slot-detail-panel muted">
-                Click a status card to view reservation details for that slot.
               </div>
             </aside>
           </div>
 
-          <div class="manager-card manager-editor">
-            <p class="eyebrow">Edit Selected Date</p>
-            <form id="manager-booking-form" class="form manager-form">
-              <label>Date
-                <input type="date" id="manager-date" required />
-              </label>
-              <div class="manager-grid">
-                <label>Full Day
-                  <select id="manager-full-day">
-                    <option value="">None</option>
-                    <option value="unavailable" disabled>Unavailable (Auto)</option>
-                    <option value="available">Available</option>
-                    <option value="tentative">Tentative</option>
-                    <option value="booked">Booked</option>
-                  </select>
-                </label>
-                <label>Half Day AM
-                  <select id="manager-half-morning">
-                    <option value="">None</option>
-                    <option value="unavailable" disabled>Unavailable (Auto)</option>
-                    <option value="available">Available</option>
-                    <option value="tentative">Tentative</option>
-                    <option value="booked">Booked</option>
-                  </select>
-                </label>
-                <label>Half Day PM
-                  <select id="manager-half-evening">
-                    <option value="">None</option>
-                    <option value="unavailable" disabled>Unavailable (Auto)</option>
-                    <option value="available">Available</option>
-                    <option value="tentative">Tentative</option>
-                    <option value="booked">Booked</option>
-                  </select>
-                </label>
-              </div>
-              <div class="btn-row">
-                <button type="submit" class="btn">Save Date</button>
-                <button type="button" id="manager-refresh" class="btn alt">Reload Calendar</button>
-              </div>
-            </form>
-            <div id="manager-reservation-summary" class="manager-reservation-summary muted"></div>
-            <div id="manager-reservations-list" class="listing"></div>
-            <hr class="manager-divider" />
-            <p class="eyebrow">Custom Time Range</p>
-            <p class="muted">Apply one booked time range across multiple dates.</p>
-            <div class="manager-range-grid">
-              <label>Start Date
-                <input type="date" id="manager-range-start-date" />
-              </label>
-              <label>End Date
-                <input type="date" id="manager-range-end-date" />
-              </label>
-              <label>Start Time
-                <input type="time" id="manager-range-start-time" value="08:00" />
-              </label>
-              <label>End Time
-                <input type="time" id="manager-range-end-time" value="21:00" />
-              </label>
-            </div>
-            <div class="btn-row">
-              <button type="button" id="manager-apply-range" class="btn">Apply Custom Time Range</button>
-            </div>
-            <p id="manager-save-message" class="muted manager-message"></p>
-          </div>
+          <p id="manager-save-message" class="muted manager-message"></p>
         </div>
       </div>
     </section>
@@ -187,7 +112,12 @@
         <h3 id="manager-modal-title">Add Booking Details</h3>
         <button type="button" id="manager-booking-modal-close" class="btn alt">Close</button>
       </div>
-      <p class="muted">Selected date: <span id="manager-modal-date-label">-</span></p>
+      <div class="manager-modal-date-row">
+        <label>Booking Date
+          <input type="date" id="manager-reservation-date" />
+        </label>
+        <p class="muted">Selected date: <span id="manager-modal-date-label">-</span></p>
+      </div>
       <div class="manager-contact-grid">
         <label>Booking Slot
           <select id="manager-reservation-slot">
@@ -198,15 +128,17 @@
             <option value="custom">Custom Time Range</option>
           </select>
         </label>
-        <label>Custom Start Time
-          <input type="time" id="manager-reservation-start-time" value="08:00" />
-        </label>
-        <label>Custom End Time
-          <input type="time" id="manager-reservation-end-time" value="09:00" />
-        </label>
         <label>Renter Name
           <input type="text" id="manager-renter-name" placeholder="Full name" />
         </label>
+        <div id="manager-custom-time-row" class="manager-custom-time-row hidden">
+          <label>Custom Start Time
+            <input type="time" id="manager-reservation-start-time" value="08:00" />
+          </label>
+          <label>Custom End Time
+            <input type="time" id="manager-reservation-end-time" value="09:00" />
+          </label>
+        </div>
         <label>Renter Email
           <input type="email" id="manager-renter-email" placeholder="name@email.com" />
         </label>
@@ -225,12 +157,14 @@
           </select>
         </label>
       </div>
-      <label>Rental Agreement Link
+      <label>Rental Agreement Option 1: OpenSign Link
         <input type="url" id="manager-agreement-url" placeholder="https://..." />
       </label>
-      <label>Rental Agreement File
+      <p class="muted manager-or-divider"><strong>OR</strong> upload a file from this computer</p>
+      <label>Rental Agreement Option 2: Upload File
         <input type="file" id="manager-agreement-file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" />
       </label>
+      <p class="muted">Use one method: paste an OpenSign link or upload the signed agreement file.</p>
       <div class="btn-row">
         <button type="button" id="manager-save-reservation" class="btn">Save Reservation Details</button>
       </div>

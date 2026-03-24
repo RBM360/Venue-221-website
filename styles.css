@@ -1,5 +1,5 @@
 :root {
-  --bg: #ffbf00;
+  --bg: #e7e6d7;
   --paper: #fffdf9;
   --text: #161616;
   --muted: #5d5d5d;
@@ -320,17 +320,13 @@ p { line-height: 1.65; }
 .manager-editor {
   margin-top: 1rem;
 }
-.manager-divider {
-  border: 0;
-  border-top: 1px solid var(--line);
-  margin: 1rem 0;
-}
-.manager-range-grid {
+.manager-contact-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.8rem;
 }
-.manager-contact-grid {
+.manager-custom-time-row {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.8rem;
@@ -358,6 +354,9 @@ p { line-height: 1.65; }
   background: #fff;
   display: grid;
   gap: 0.6rem;
+}
+.block-card-detail {
+  margin-top: 0.7rem;
 }
 .manager-slot-record {
   border: 1px solid var(--line);
@@ -398,6 +397,20 @@ p { line-height: 1.65; }
   align-items: center;
   gap: 0.8rem;
 }
+.manager-modal-date-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 1rem;
+  align-items: end;
+}
+.manager-or-divider {
+  margin: 0.1rem 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  text-align: center;
+  background: color-mix(in oklab, var(--paper) 80%, transparent);
+}
 body.modal-open {
   overflow: hidden;
 }
@@ -417,6 +430,11 @@ body.modal-open {
 }
 .manager-message {
   margin: 0.8rem 0 0;
+}
+.manager-date-actions {
+  margin-top: 0.6rem;
+  display: flex;
+  gap: 0.5rem;
 }
 .manager-message.is-error {
   color: #9a2f25;
@@ -455,7 +473,8 @@ body.modal-open {
   .booking-wrap { grid-template-columns: 1fr; }
   .manager-grid { grid-template-columns: 1fr; }
   .manager-contact-grid { grid-template-columns: 1fr; }
-  .manager-range-grid { grid-template-columns: 1fr; }
+  .manager-custom-time-row { grid-template-columns: 1fr; }
+  .manager-modal-date-row { grid-template-columns: 1fr; }
   .calendar-controls { grid-template-columns: 1fr 1fr; }
   .booking-form .form-grid { grid-template-columns: 1fr; }
   .hero { padding-top: 3.2rem; }

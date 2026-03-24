@@ -193,10 +193,12 @@ if (bookingGrid && bookingMonth && bookingYear && bookingSelectedDate && booking
 
   function getDayStatus(dateKey) {
     const detail = getBlockDetail(dateKey);
-    if (detail.fullDay.status === "booked") return "booked";
-    if (detail.fullDay.status === "tentative" || detail.halfMorning.status === "tentative" || detail.halfEvening.status === "tentative") return "tentative";
-    if (detail.halfMorning.status === "booked" || detail.halfEvening.status === "booked") return "booked";
-    if (detail.fullDay.status === "unavailable" && detail.hourly.status === "unavailable") return "unavailable";
+    const core = [detail.fullDay.status, detail.halfMorning.status, detail.halfEvening.status];
+    if (core.includes("available") || detail.hourly.status === "available") return "available";
+    if (core.every((status) => status === "booked")) return "booked";
+    if (core.every((status) => status === "unavailable") && detail.hourly.status === "unavailable") return "unavailable";
+    if (core.includes("booked")) return "booked";
+    if (core.includes("tentative")) return "tentative";
     return "available";
   }
 
@@ -214,58 +216,54 @@ if (bookingGrid && bookingMonth && bookingYear && bookingSelectedDate && booking
     if (fullExplicit && fullExplicit !== "available") {
       fullDay.status = fullExplicit;
       fullDay.label = toLabel(fullExplicit);
-      halfMorning.status = "unavailable";
-      halfMorning.label = toLabel("unavailable");
-      halfEvening.status = "unavailable";
-      halfEvening.label = toLabel("unavailable");
-    } else {
-      if (amExplicit) {
-        halfMorning.status = amExplicit;
-        halfMorning.label = toLabel(amExplicit);
-      }
-      if (pmExplicit) {
-        halfEvening.status = pmExplicit;
-        halfEvening.label = toLabel(pmExplicit);
-      }
+    }
+    if (amExplicit) {
+      halfMorning.status = amExplicit;
+      halfMorning.label = toLabel(amExplicit);
+    }
+    if (pmExplicit) {
+      halfEvening.status = pmExplicit;
+      halfEvening.label = toLabel(pmExplicit);
+    }
 
+    if (!(fullExplicit && fullExplicit !== "available")) {
       hourly.valid.forEach((slot) => {
-        if (overlaps(slot.start, slot.end, 8, 14) && halfMorning.status === "available") {
-          halfMorning.status = "unavailable";
-          halfMorning.label = toLabel("unavailable");
+        if (overlaps(slot.start, slot.end, 8, 14)) {
+          halfMorning.status = setBookedUnlessTentative(halfMorning.status);
+          halfMorning.label = toLabel(halfMorning.status);
         }
-        if (overlaps(slot.start, slot.end, 15, 21) && halfEvening.status === "available") {
-          halfEvening.status = "unavailable";
-          halfEvening.label = toLabel("unavailable");
+        if (overlaps(slot.start, slot.end, 15, 21)) {
+          halfEvening.status = setBookedUnlessTentative(halfEvening.status);
+          halfEvening.label = toLabel(halfEvening.status);
         }
       });
 
-      const anyBlocker =
-        halfMorning.status !== "available" ||
-        halfEvening.status !== "available" ||
-        hourly.valid.length > 0;
-      if (anyBlocker) {
-        fullDay.status = "unavailable";
-        fullDay.label = toLabel("unavailable");
+      const halfStatuses = [halfMorning.status, halfEvening.status];
+      if (halfStatuses.some((status) => status === "tentative")) {
+        fullDay.status = "tentative";
+      } else if (halfStatuses.some((status) => status === "booked") || hourly.valid.length > 0) {
+        fullDay.status = "booked";
+      } else {
+        fullDay.status = "available";
       }
+      fullDay.label = toLabel(fullDay.status);
     }
 
     const hasInvalidHourly = hourly.invalid.length > 0;
-    const amOpenForHourly = halfMorning.status === "available";
-    const pmOpenForHourly = halfEvening.status === "available";
-    const anyHourlyOpenWindow = amOpenForHourly || pmOpenForHourly;
-    const hourlyStatus = hourly.valid.some((s) => s.status === "tentative")
-      ? "tentative"
-      : hourly.valid.some((s) => s.status === "booked")
-        ? "booked"
-        : anyHourlyOpenWindow
-          ? "available"
-          : "unavailable";
+    const anyHourlyOpenWindow = hasAnyOpenHourlyWindow(hourly.valid, fullExplicit);
+    const hourlyStatus = anyHourlyOpenWindow
+      ? "available"
+      : hourly.valid.some((s) => s.status === "tentative")
+        ? "tentative"
+        : hourly.valid.some((s) => s.status === "booked")
+          ? "booked"
+          : fullExplicit === "unavailable"
+            ? "unavailable"
+            : "available";
 
-    let hourlyNote = anyHourlyOpenWindow ? "Call for available times." : "No hourly windows available for this date.";
-    if (hasInvalidHourly) {
-      hourlyNote = "Call for available times (one or more holds need review).";
-    } else if (hourly.valid.length > 0) {
-      hourlyNote = `Filled hourly blocks: ${hourly.valid.map((s) => `${formatHour(s.start)}-${formatHour(s.end)} (${toLabel(s.status)})`).join(", ")}`;
+    let hourlyNote = anyHourlyOpenWindow ? "Call to see available hourly times." : "No hourly windows available for this date.";
+    if (hasInvalidHourly || hourly.valid.length > 0) {
+      hourlyNote = "Call to see available hourly times.";
     }
 
     return {
@@ -288,9 +286,7 @@ if (bookingGrid && bookingMonth && bookingYear && bookingSelectedDate && booking
       const end = Number(slot.end);
       const status = normalizeStatus(slot.status) || "booked";
       const inRange = start >= 8 && end <= 21 && end > start;
-      const crossesHalfBlocks = start < 14 && end > 15;
-      const straddlesBreak = start < 15 && end > 14;
-      if (!inRange || crossesHalfBlocks || straddlesBreak) {
+      if (!inRange) {
         invalid.push({ start, end, status });
       } else {
         valid.push({ start, end, status });
@@ -299,15 +295,45 @@ if (bookingGrid && bookingMonth && bookingYear && bookingSelectedDate && booking
     return { valid, invalid };
   }
 
+  function hasAnyOpenHourlyWindow(slots, fullExplicit) {
+    const minWindow = 4;
+    const bufferHours = 0.5;
+    if (fullExplicit === "unavailable") return false;
+    if ((fullExplicit === "booked" || fullExplicit === "tentative") && !slots.length) return false;
+
+    const blocked = slots
+      .filter((slot) => slot.status === "booked" || slot.status === "tentative" || slot.status === "unavailable")
+      .map((slot) => ({ start: Number(slot.start) - bufferHours, end: Number(slot.end) + bufferHours }))
+      .filter((slot) => Number.isFinite(slot.start) && Number.isFinite(slot.end) && slot.end > slot.start)
+      .sort((a, b) => a.start - b.start);
+
+    if (!blocked.length) return 21 - 8 >= minWindow;
+
+    let cursor = 8;
+    for (const slot of blocked) {
+      const start = Math.max(8, slot.start);
+      const end = Math.min(21, slot.end);
+      if (start - cursor >= minWindow) return true;
+      if (end > cursor) cursor = end;
+      if (cursor >= 21) return false;
+    }
+    return 21 - cursor >= minWindow;
+  }
+
   function normalizeStatus(value) {
     if (value === null || value === undefined) return null;
     const normalized = String(value).toLowerCase();
-    if (normalized === "booked" || normalized === "tentative" || normalized === "available") return normalized;
+    if (normalized === "booked" || normalized === "tentative" || normalized === "available" || normalized === "unavailable") return normalized;
     return null;
   }
 
   function overlaps(startA, endA, startB, endB) {
     return startA < endB && startB < endA;
+  }
+
+  function setBookedUnlessTentative(currentStatus) {
+    if (currentStatus === "tentative") return currentStatus;
+    return "booked";
   }
 
   function toLabel(status) {
@@ -325,10 +351,15 @@ if (bookingGrid && bookingMonth && bookingYear && bookingSelectedDate && booking
   }
 
   function formatHour(hour24) {
-    const hour = Number(hour24);
+    const raw = Number(hour24);
+    if (!Number.isFinite(raw)) return "";
+    const totalMinutes = Math.round(raw * 60);
+    const hour = Math.floor(totalMinutes / 60);
+    const minutes = Math.abs(totalMinutes % 60);
     const suffix = hour >= 12 ? "PM" : "AM";
     const normalized = hour % 12 === 0 ? 12 : hour % 12;
-    return `${normalized}${suffix}`;
+    const minuteText = minutes ? `:${String(minutes).padStart(2, "0")}` : "";
+    return `${normalized}${minuteText}${suffix}`;
   }
 
   async function loadBookingData() {

@@ -97,23 +97,34 @@ function wireEvents(allowedEmails) {
 
     const email = String(document.querySelector("#manager-email")?.value || "").trim();
     const password = String(document.querySelector("#manager-password")?.value || "");
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setMessage(authMessage, error.message, true);
+        return;
+      }
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setMessage(authMessage, error.message, true);
-      return;
+      const signedInEmail = data.user?.email || data.session?.user?.email || "";
+      if (!canUseManager(signedInEmail, allowedEmails)) {
+        await supabase.auth.signOut();
+        setMessage(authMessage, "This account is not approved for manager access.", true);
+        return;
+      }
+
+      await setSignedInState(signedInEmail);
+      await refreshCalendar();
+    } catch (error) {
+      const message = String(error?.message || error || "");
+      if (/failed to fetch/i.test(message)) {
+        setMessage(
+          authMessage,
+          "Unable to reach Supabase. Check VITE_SUPABASE_URL in .env (project URL) and restart the dev server.",
+          true
+        );
+        return;
+      }
+      setMessage(authMessage, message || "Sign in failed.", true);
     }
-
-    const { data } = await supabase.auth.getUser();
-    const signedInEmail = data.user?.email || "";
-    if (!canUseManager(signedInEmail, allowedEmails)) {
-      await supabase.auth.signOut();
-      setMessage(authMessage, "This account is not approved for manager access.", true);
-      return;
-    }
-
-    await setSignedInState(signedInEmail);
-    await refreshCalendar();
   });
 
   signoutButton?.addEventListener("click", async () => {
@@ -192,6 +203,8 @@ function wireEvents(allowedEmails) {
       void markSlotAvailable(selectedKey, slot);
       return;
     }
+
+    if (event.target.closest(".block-card-detail")) return;
 
     const card = event.target.closest(".block-card[data-slot]");
     if (!card) return;

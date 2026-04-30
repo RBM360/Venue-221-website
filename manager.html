@@ -56,7 +56,14 @@
             </div>
           </div>
 
-          <div class="booking-wrap manager-calendar-wrap">
+          <div class="manager-card manager-view-tabs">
+            <div class="btn-row">
+              <button type="button" id="manager-tab-bookings" class="btn">Bookings</button>
+              <button type="button" id="manager-tab-forms" class="btn alt">Forms</button>
+            </div>
+          </div>
+
+          <div id="manager-bookings-view" class="booking-wrap manager-calendar-wrap">
             <div class="calendar-card">
               <div class="calendar-controls">
                 <button class="btn alt calendar-nav" type="button" id="manager-prev-month">Prev</button>
@@ -100,6 +107,55 @@
           </div>
 
           <p id="manager-save-message" class="muted manager-message"></p>
+
+          <div id="manager-forms-view" class="manager-card manager-forms hidden">
+            <div class="manager-forms-subtabs">
+              <button type="button" id="manager-forms-tab-templates" class="btn">Templates</button>
+              <button type="button" id="manager-forms-tab-outstanding" class="btn alt">Outstanding</button>
+              <button type="button" id="manager-forms-tab-completed" class="btn alt">Completed</button>
+              <button type="button" id="manager-forms-tab-settings" class="btn alt">Settings</button>
+            </div>
+
+            <section id="manager-forms-templates-panel">
+              <h3>Agreement Templates</h3>
+              <p class="muted">Upload a PDF template and reuse it when creating bookings.</p>
+              <div class="manager-template-form">
+                <label>Template Name
+                  <input type="text" id="manager-template-name" placeholder="Venue 221 Rental Agreement" />
+                </label>
+                <label>Template PDF
+                  <input type="file" id="manager-template-file" accept=".pdf" />
+                </label>
+                <button type="button" id="manager-template-save" class="btn">Save Template</button>
+              </div>
+              <div id="manager-template-list" class="manager-list"></div>
+            </section>
+
+            <section id="manager-forms-outstanding-panel" class="hidden">
+              <h3>Outstanding Agreements</h3>
+              <div id="manager-outstanding-list" class="manager-list"></div>
+            </section>
+
+            <section id="manager-forms-completed-panel" class="hidden">
+              <h3>Completed Agreements</h3>
+              <div id="manager-completed-list" class="manager-list"></div>
+            </section>
+
+            <section id="manager-forms-settings-panel" class="hidden">
+              <h3>Agreement Settings</h3>
+              <p class="muted">Set notification email for renter submissions waiting manager approval.</p>
+              <div class="manager-template-form">
+                <label>Notify Email
+                  <input type="email" id="manager-settings-notify-email" placeholder="manager@venue221.net" />
+                </label>
+                <label>Venue Signer Email
+                  <input type="email" id="manager-settings-venue-signer-email" placeholder="contracts@venue221.net" />
+                </label>
+                <button type="button" id="manager-settings-save" class="btn">Save Settings</button>
+              </div>
+            </section>
+            <p id="manager-forms-message" class="muted manager-message"></p>
+          </div>
         </div>
       </div>
     </section>
@@ -156,17 +212,95 @@
             <option value="needs_payment">Needs Payment</option>
           </select>
         </label>
+        <label>Booking Status
+          <select id="manager-reservation-status">
+            <option value="booked">Booked (Confirmed)</option>
+            <option value="pending">Pending Request</option>
+            <option value="tentative">Tentative Hold</option>
+          </select>
+        </label>
       </div>
-      <label>Rental Agreement Option 1: OpenSign Link
-        <input type="url" id="manager-agreement-url" placeholder="https://..." />
+      <label>Agreement Template
+        <select id="manager-template-select">
+          <option value="">Select a saved template</option>
+        </select>
       </label>
-      <p class="muted manager-or-divider"><strong>OR</strong> upload a file from this computer</p>
-      <label>Rental Agreement Option 2: Upload File
-        <input type="file" id="manager-agreement-file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" />
-      </label>
-      <p class="muted">Use one method: paste an OpenSign link or upload the signed agreement file.</p>
+      <p class="muted">A saved template is required. The renter will receive an email link to sign.</p>
       <div class="btn-row">
         <button type="button" id="manager-save-reservation" class="btn">Save Reservation Details</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="manager-template-designer-modal" class="manager-modal hidden" aria-hidden="true">
+    <div class="manager-modal-backdrop" data-template-modal-close></div>
+    <div class="manager-modal-dialog manager-template-designer-dialog" role="dialog" aria-modal="true" aria-labelledby="manager-template-designer-title">
+      <div class="manager-modal-header">
+        <h3 id="manager-template-designer-title">Template Field Designer</h3>
+        <button type="button" id="manager-template-designer-close" class="btn alt">Close</button>
+      </div>
+      <div class="manager-template-designer-grid">
+        <aside class="manager-template-pages">
+          <p class="eyebrow">Pages</p>
+          <div id="manager-template-page-thumbs" class="manager-template-page-thumbs"></div>
+        </aside>
+
+        <div class="manager-template-stage-wrap">
+          <div class="manager-template-stage-toolbar">
+            <p class="manager-selected-field-title">Selected Field Details</p>
+            <label>Field Key
+              <input type="text" id="manager-field-key" placeholder="renter_full_name" />
+            </label>
+            <label>Autofill
+              <select id="manager-field-autofill-source">
+                <option value="">Manual Entry</option>
+                <option value="renter_name">Renter Name</option>
+                <option value="renter_email">Renter Email</option>
+                <option value="renter_phone">Renter Phone</option>
+                <option value="event_type">Event Type</option>
+                <option value="reservation_date">Reservation Date</option>
+                <option value="slot_label">Booking Slot</option>
+              </select>
+            </label>
+            <label>Role
+              <select id="manager-field-signer-role">
+                <option value="renter">Customer</option>
+                <option value="venue">Manager</option>
+              </select>
+            </label>
+            <label><input type="checkbox" id="manager-field-required" checked /> Required</label>
+          </div>
+          <canvas id="manager-template-canvas" width="900" height="1200"></canvas>
+          <div id="manager-template-overlay" class="manager-template-overlay"></div>
+        </div>
+
+        <aside class="manager-template-field-list opensign-style-sidebar">
+          <p class="eyebrow">Roles</p>
+          <div class="manager-role-list">
+            <button type="button" class="btn alt role-pill is-active" data-role-select="venue">Manager</button>
+            <button type="button" class="btn alt role-pill" data-role-select="renter">Customer</button>
+          </div>
+          <p class="eyebrow">Widgets</p>
+          <div class="manager-widget-grid">
+            <button type="button" class="widget-btn" data-widget-type="signature">Signature</button>
+            <button type="button" class="widget-btn" data-widget-type="initial">Initials</button>
+            <button type="button" class="widget-btn is-active" data-widget-type="text">Text</button>
+            <button type="button" class="widget-btn" data-widget-type="number">Number</button>
+            <button type="button" class="widget-btn" data-widget-type="name">Name</button>
+            <button type="button" class="widget-btn" data-widget-type="email">Email</button>
+            <button type="button" class="widget-btn" data-widget-type="phone">Phone</button>
+            <button type="button" class="widget-btn" data-widget-type="date">Date</button>
+            <button type="button" class="widget-btn" data-widget-type="checkbox">Checkbox</button>
+            <button type="button" class="widget-btn" data-widget-type="dropdown">Dropdown</button>
+          </div>
+          <div class="manager-list-actions">
+            <button type="button" id="manager-add-field-block" class="btn">Add Selected Widget</button>
+            <button type="button" id="manager-save-field-layout" class="btn alt">Save Layout</button>
+          </div>
+          <p class="eyebrow">Placed Fields</p>
+          <div id="manager-template-field-items" class="manager-list"></div>
+          <p id="manager-template-designer-message" class="muted manager-message"></p>
+        </aside>
       </div>
     </div>
   </div>

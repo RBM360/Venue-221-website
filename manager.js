@@ -1,4 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
+GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const authPanel = document.querySelector("#manager-auth-panel");
 const appPanel = document.querySelector("#manager-app-panel");
@@ -22,9 +26,46 @@ const renterEmailInput = document.querySelector("#manager-renter-email");
 const renterPhoneInput = document.querySelector("#manager-renter-phone");
 const eventTypeInput = document.querySelector("#manager-event-type");
 const paymentStatusInput = document.querySelector("#manager-payment-status");
+const reservationStatusInput = document.querySelector("#manager-reservation-status");
 const agreementUrlInput = document.querySelector("#manager-agreement-url");
 const agreementFileInput = document.querySelector("#manager-agreement-file");
+const templateSelectInput = document.querySelector("#manager-template-select");
 const saveReservationButton = document.querySelector("#manager-save-reservation");
+const bookingTabButton = document.querySelector("#manager-tab-bookings");
+const formsTabButton = document.querySelector("#manager-tab-forms");
+const bookingsView = document.querySelector("#manager-bookings-view");
+const formsView = document.querySelector("#manager-forms-view");
+const formsTemplatesTabButton = document.querySelector("#manager-forms-tab-templates");
+const formsOutstandingTabButton = document.querySelector("#manager-forms-tab-outstanding");
+const formsCompletedTabButton = document.querySelector("#manager-forms-tab-completed");
+const formsSettingsTabButton = document.querySelector("#manager-forms-tab-settings");
+const formsTemplatesPanel = document.querySelector("#manager-forms-templates-panel");
+const formsOutstandingPanel = document.querySelector("#manager-forms-outstanding-panel");
+const formsCompletedPanel = document.querySelector("#manager-forms-completed-panel");
+const formsSettingsPanel = document.querySelector("#manager-forms-settings-panel");
+const templateNameInput = document.querySelector("#manager-template-name");
+const templateFileInput = document.querySelector("#manager-template-file");
+const templateSaveButton = document.querySelector("#manager-template-save");
+const templateList = document.querySelector("#manager-template-list");
+const outstandingList = document.querySelector("#manager-outstanding-list");
+const completedList = document.querySelector("#manager-completed-list");
+const formsMessage = document.querySelector("#manager-forms-message");
+const settingsNotifyEmailInput = document.querySelector("#manager-settings-notify-email");
+const settingsVenueSignerEmailInput = document.querySelector("#manager-settings-venue-signer-email");
+const settingsSaveButton = document.querySelector("#manager-settings-save");
+const templateDesignerModal = document.querySelector("#manager-template-designer-modal");
+const templateDesignerCloseButton = document.querySelector("#manager-template-designer-close");
+const templateCanvas = document.querySelector("#manager-template-canvas");
+const templateOverlay = document.querySelector("#manager-template-overlay");
+const templateFieldItems = document.querySelector("#manager-template-field-items");
+const templateDesignerMessage = document.querySelector("#manager-template-designer-message");
+const addFieldBlockButton = document.querySelector("#manager-add-field-block");
+const saveFieldLayoutButton = document.querySelector("#manager-save-field-layout");
+const fieldKeyInput = document.querySelector("#manager-field-key");
+const fieldAutofillSourceInput = document.querySelector("#manager-field-autofill-source");
+const fieldSignerRoleInput = document.querySelector("#manager-field-signer-role");
+const fieldRequiredInput = document.querySelector("#manager-field-required");
+const pageThumbsNode = document.querySelector("#manager-template-page-thumbs");
 
 const calendarGrid = document.querySelector("#manager-calendar-grid");
 const monthSelect = document.querySelector("#manager-month");
@@ -49,6 +90,17 @@ let activeMonth = new Date().getMonth();
 let activeYear = new Date().getFullYear();
 let activeSlot = "";
 let bookingReasonColumnsAvailable = true;
+let reservationCreatedAtColumnAvailable = true;
+let agreementTemplates = [];
+let agreementRecords = [];
+let activeTemplateDesignId = 0;
+let activeTemplateDesignFields = [];
+let activeTemplateCanvasSize = { width: 900, height: 1200 };
+let activeTemplatePdf = null;
+let activeTemplatePage = 1;
+let activeWidgetType = "text";
+let activeFieldSelectionId = "";
+let agreementSettings = null;
 
 if (loginForm && calendarGrid && monthSelect && yearSelect) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
@@ -180,6 +232,15 @@ function wireEvents(allowedEmails) {
       return;
     }
 
+    const setStatusButton = event.target.closest("[data-set-reservation-status]");
+    if (setStatusButton) {
+      const id = Number(setStatusButton.getAttribute("data-set-reservation-status"));
+      const nextStatus = String(setStatusButton.getAttribute("data-next-status") || "");
+      if (!Number.isFinite(id) || !nextStatus) return;
+      void updateReservationStatusById(id, nextStatus);
+      return;
+    }
+
     const addButton = event.target.closest("[data-add-slot]");
     if (addButton) {
       const slot = String(addButton.getAttribute("data-add-slot") || "");
@@ -224,6 +285,80 @@ function wireEvents(allowedEmails) {
     openBookingModal();
   });
 
+  bookingTabButton?.addEventListener("click", () => {
+    switchManagerView("bookings");
+  });
+  formsTabButton?.addEventListener("click", async () => {
+    switchManagerView("forms");
+    await refreshFormsData();
+  });
+  formsTemplatesTabButton?.addEventListener("click", () => switchFormsSubtab("templates"));
+  formsOutstandingTabButton?.addEventListener("click", () => switchFormsSubtab("outstanding"));
+  formsCompletedTabButton?.addEventListener("click", () => switchFormsSubtab("completed"));
+  formsSettingsTabButton?.addEventListener("click", () => switchFormsSubtab("settings"));
+  templateSaveButton?.addEventListener("click", async () => {
+    await saveAgreementTemplate();
+  });
+  settingsSaveButton?.addEventListener("click", async () => {
+    await saveAgreementSettings();
+  });
+  formsView?.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const approveButton = event.target.closest("[data-approve-agreement-id]");
+    if (approveButton) {
+      const id = Number(approveButton.getAttribute("data-approve-agreement-id"));
+      if (Number.isFinite(id)) void approveAgreementAndActivateBooking(id);
+      return;
+    }
+    const deleteButton = event.target.closest("[data-template-delete-id]");
+    if (deleteButton) {
+      const id = Number(deleteButton.getAttribute("data-template-delete-id"));
+      if (Number.isFinite(id)) void deleteAgreementTemplate(id);
+      return;
+    }
+    const printButton = event.target.closest("[data-print-pdf-url]");
+    if (printButton) {
+      const url = String(printButton.getAttribute("data-print-pdf-url") || "");
+      if (!url) return;
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (win) win.focus();
+      return;
+    }
+    const designButton = event.target.closest("[data-template-design-id]");
+    if (designButton) {
+      const id = Number(designButton.getAttribute("data-template-design-id"));
+      if (Number.isFinite(id)) void openTemplateDesigner(id);
+    }
+  });
+  templateDesignerCloseButton?.addEventListener("click", closeTemplateDesigner);
+  templateDesignerModal?.addEventListener("click", (event) => {
+    if (event.target instanceof HTMLElement && event.target.hasAttribute("data-template-modal-close")) {
+      closeTemplateDesigner();
+    }
+  });
+  addFieldBlockButton?.addEventListener("click", () => addTemplateFieldBlock());
+  saveFieldLayoutButton?.addEventListener("click", async () => {
+    await saveTemplateFieldLayout();
+  });
+  templateDesignerModal?.querySelectorAll("[data-widget-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const widgetType = String(button.getAttribute("data-widget-type") || "text").trim().toLowerCase();
+      activeWidgetType = normalizeWidgetType(widgetType);
+      templateDesignerModal?.querySelectorAll("[data-widget-type]").forEach((node) => node.classList.toggle("is-active", node === button));
+    });
+  });
+  templateDesignerModal?.querySelectorAll("[data-role-select]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const role = String(button.getAttribute("data-role-select") || "renter");
+      if (fieldSignerRoleInput) fieldSignerRoleInput.value = role;
+      templateDesignerModal?.querySelectorAll("[data-role-select]").forEach((node) => node.classList.toggle("is-active", node === button));
+    });
+  });
+  fieldKeyInput?.addEventListener("change", () => updateSelectedFieldFromInputs());
+  fieldAutofillSourceInput?.addEventListener("change", () => updateSelectedFieldFromInputs());
+  fieldSignerRoleInput?.addEventListener("change", () => updateSelectedFieldFromInputs());
+  fieldRequiredInput?.addEventListener("change", () => updateSelectedFieldFromInputs());
+
   markDateUnavailableButton?.addEventListener("click", () => {
     void markDateUnavailable(selectedKey);
   });
@@ -247,6 +382,18 @@ function wireEvents(allowedEmails) {
     if (event.key === "Escape" && bookingModal && !bookingModal.classList.contains("hidden")) {
       closeBookingModal();
     }
+    if (event.key === "Escape" && templateDesignerModal && !templateDesignerModal.classList.contains("hidden")) {
+      closeTemplateDesigner();
+    }
+    if ((event.key === "Delete" || event.key === "Backspace") && templateDesignerModal && !templateDesignerModal.classList.contains("hidden")) {
+      if (activeFieldSelectionId) {
+        deleteTemplateFieldById(activeFieldSelectionId);
+      }
+    }
+  });
+  window.addEventListener("resize", () => {
+    syncTemplateOverlaySize();
+    renderTemplateFieldOverlay();
   });
 
     saveReservationButton?.addEventListener("click", async () => {
@@ -287,7 +434,10 @@ async function init() {
   }
 
   await setSignedInState(email);
+  switchManagerView("bookings");
+  switchFormsSubtab("templates");
   await refreshCalendar(selectedKey);
+  await refreshFormsData();
 }
 
 async function refreshCalendar(dateToSelect = selectedKey) {
@@ -302,6 +452,30 @@ async function refreshCalendar(dateToSelect = selectedKey) {
   renderDayDetails(selectedKey);
   populateEditorFromDate(selectedKey);
   await loadAndRenderReservations(selectedKey);
+}
+
+function switchManagerView(view) {
+  const showForms = view === "forms";
+  bookingsView?.classList.toggle("hidden", showForms);
+  saveMessage?.classList.toggle("hidden", showForms);
+  formsView?.classList.toggle("hidden", !showForms);
+  bookingTabButton?.classList.toggle("alt", showForms);
+  formsTabButton?.classList.toggle("alt", !showForms);
+}
+
+function switchFormsSubtab(tab) {
+  const isTemplates = tab === "templates";
+  const isOutstanding = tab === "outstanding";
+  const isCompleted = tab === "completed";
+  const isSettings = tab === "settings";
+  formsTemplatesPanel?.classList.toggle("hidden", !isTemplates);
+  formsOutstandingPanel?.classList.toggle("hidden", !isOutstanding);
+  formsCompletedPanel?.classList.toggle("hidden", !isCompleted);
+  formsSettingsPanel?.classList.toggle("hidden", !isSettings);
+  formsTemplatesTabButton?.classList.toggle("alt", !isTemplates);
+  formsOutstandingTabButton?.classList.toggle("alt", !isOutstanding);
+  formsCompletedTabButton?.classList.toggle("alt", !isCompleted);
+  formsSettingsTabButton?.classList.toggle("alt", !isSettings);
 }
 
 function renderCalendar() {
@@ -645,6 +819,8 @@ function setSignedOutState() {
   authPanel?.classList.remove("hidden");
   appPanel?.classList.add("hidden");
   if (userLine) userLine.textContent = "";
+  agreementTemplates = [];
+  agreementRecords = [];
 }
 
 function setMessage(node, message, isError = false) {
@@ -661,13 +837,13 @@ function syncSelectors() {
 function nullIfEmpty(value) {
   const trimmed = String(value || "").trim().toLowerCase();
   if (!trimmed) return null;
-  if (trimmed === "booked" || trimmed === "tentative" || trimmed === "available" || trimmed === "unavailable") return trimmed;
+  if (trimmed === "booked" || trimmed === "tentative" || trimmed === "pending" || trimmed === "available" || trimmed === "unavailable") return trimmed;
   return null;
 }
 
 function normalizeStatus(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "booked" || normalized === "tentative" || normalized === "available" || normalized === "unavailable") return normalized;
+  if (normalized === "booked" || normalized === "tentative" || normalized === "pending" || normalized === "available" || normalized === "unavailable") return normalized;
   return "";
 }
 
@@ -724,11 +900,19 @@ function renderReservationSummary(reservations) {
 }
 
 async function loadAndRenderReservations(dateKey) {
+  const selectFields = reservationCreatedAtColumnAvailable
+    ? "id, date, booking_type, start_hour, end_hour, status, renter_name, renter_email, renter_phone, event_type, payment_status, rental_agreement_url, created_at"
+    : "id, date, booking_type, start_hour, end_hour, status, renter_name, renter_email, renter_phone, event_type, payment_status, rental_agreement_url";
   const { data, error } = await supabase
     .from("booking_reservations")
-    .select("id, date, booking_type, start_hour, end_hour, status, renter_name, renter_email, renter_phone, event_type, payment_status, rental_agreement_url")
+    .select(selectFields)
     .eq("date", dateKey)
     .order("start_hour", { ascending: true });
+
+  if (error && reservationCreatedAtColumnAvailable && isMissingColumnError(error)) {
+    reservationCreatedAtColumnAvailable = false;
+    return await loadAndRenderReservations(dateKey);
+  }
 
   if (error) {
     reservationData[dateKey] = [];
@@ -742,6 +926,684 @@ async function loadAndRenderReservations(dateKey) {
   reservationData[dateKey] = rows;
   renderReservationSummary(rows);
   renderDayDetails(dateKey);
+}
+
+async function refreshFormsData() {
+  const templatesResult = await supabase
+    .from("agreement_templates")
+    .select("id, name, file_url, storage_path, is_active, created_at")
+    .order("created_at", { ascending: false });
+
+  if (templatesResult.error) {
+    agreementTemplates = [];
+    renderTemplateList();
+    populateTemplateSelect();
+    setMessage(formsMessage, `Unable to load templates: ${templatesResult.error.message}`, true);
+  } else {
+    agreementTemplates = Array.isArray(templatesResult.data) ? templatesResult.data : [];
+    renderTemplateList();
+    populateTemplateSelect();
+  }
+
+  const agreementsResult = await supabase
+    .from("booking_agreements")
+    .select("id, reservation_id, reservation_date, renter_name, renter_email, agreement_status, opensign_document_id, draft_pdf_url, signed_pdf_url, created_at, completed_at")
+    .order("created_at", { ascending: false });
+
+  if (agreementsResult.error) {
+    agreementRecords = [];
+    renderAgreementLists();
+    setMessage(formsMessage, `Unable to load agreements: ${agreementsResult.error.message}`, true);
+    return;
+  }
+
+  agreementRecords = Array.isArray(agreementsResult.data) ? agreementsResult.data : [];
+  renderAgreementLists();
+  await loadAgreementSettings();
+  setMessage(formsMessage, "");
+}
+
+async function loadAgreementSettings() {
+  const result = await supabase
+    .from("agreement_settings")
+    .select("id, notify_email, venue_signer_email, updated_at")
+    .order("id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (result.error) return;
+  agreementSettings = result.data || null;
+  if (settingsNotifyEmailInput) settingsNotifyEmailInput.value = agreementSettings?.notify_email || "";
+  if (settingsVenueSignerEmailInput) settingsVenueSignerEmailInput.value = agreementSettings?.venue_signer_email || "";
+}
+
+async function saveAgreementSettings() {
+  const notifyEmail = cleanText(settingsNotifyEmailInput?.value);
+  const venueSignerEmail = cleanText(settingsVenueSignerEmailInput?.value);
+  if (!notifyEmail) {
+    setMessage(formsMessage, "Notify email is required.", true);
+    return;
+  }
+  const payload = {
+    id: 1,
+    notify_email: notifyEmail,
+    venue_signer_email: venueSignerEmail,
+  };
+  const result = await supabase.from("agreement_settings").upsert(payload, { onConflict: "id" });
+  if (result.error) {
+    setMessage(formsMessage, `Unable to save settings: ${result.error.message}`, true);
+    return;
+  }
+  setMessage(formsMessage, "Settings saved.");
+  await loadAgreementSettings();
+}
+
+function renderTemplateList() {
+  if (!templateList) return;
+  if (!agreementTemplates.length) {
+    templateList.innerHTML = `<p class="muted">No templates saved yet.</p>`;
+    return;
+  }
+  templateList.innerHTML = agreementTemplates
+    .map((row) => `
+      <article class="manager-list-card">
+        <p><strong>${escapeHtml(row.name || "Untitled Template")}</strong></p>
+        <p class="muted">Added: ${escapeHtml(formatDateTimeLabel(row.created_at))}</p>
+        <div class="manager-list-actions">
+          <button type="button" class="btn" data-template-design-id="${row.id}">Edit Fields</button>
+          ${row.file_url ? `<a class="btn alt" href="${row.file_url}" target="_blank" rel="noopener noreferrer">Open PDF</a>` : ""}
+          <button type="button" class="btn alt" data-template-delete-id="${row.id}">Delete</button>
+        </div>
+      </article>
+    `)
+    .join("");
+}
+
+function populateTemplateSelect() {
+  if (!templateSelectInput) return;
+  const currentValue = templateSelectInput.value;
+  templateSelectInput.innerHTML = `<option value="">No template selected</option>`;
+  agreementTemplates
+    .filter((row) => row.is_active !== false)
+    .forEach((row) => {
+      const option = document.createElement("option");
+      option.value = String(row.id);
+      option.textContent = String(row.name || `Template ${row.id}`);
+      templateSelectInput.append(option);
+    });
+  const hasCurrent = Array.from(templateSelectInput.options).some((option) => option.value === currentValue);
+  if (currentValue && hasCurrent) {
+    templateSelectInput.value = currentValue;
+  }
+}
+
+function renderAgreementLists() {
+  if (!outstandingList || !completedList) return;
+  const completedStates = new Set(["approved", "completed"]);
+  const outstanding = agreementRecords.filter((row) => !completedStates.has(String(row.agreement_status || "")));
+  const completed = agreementRecords.filter((row) => completedStates.has(String(row.agreement_status || "")));
+  renderAgreementList(outstandingList, outstanding, false);
+  renderAgreementList(completedList, completed, true);
+}
+
+function renderAgreementList(node, items, isCompleted) {
+  if (!node) return;
+  if (!items.length) {
+    node.innerHTML = `<p class="muted">${isCompleted ? "No completed agreements yet." : "No outstanding agreements."}</p>`;
+    return;
+  }
+  node.innerHTML = items
+    .map((row) => `
+      <article class="manager-list-card">
+        <p><strong>${escapeHtml(row.renter_name || "Unknown Renter")}</strong> (${escapeHtml(row.reservation_date || "-")})</p>
+        <p class="muted">Email: ${escapeHtml(row.renter_email || "Not set")}</p>
+        <p class="muted">Status: ${escapeHtml(agreementStatusLabel(row.agreement_status || "pending_signature"))}</p>
+        <p class="muted">Added: ${escapeHtml(formatDateTimeLabel(row.created_at))}</p>
+        ${row.completed_at ? `<p class="muted">Completed: ${escapeHtml(formatDateTimeLabel(row.completed_at))}</p>` : ""}
+        <div class="manager-list-actions">
+          ${row.agreement_status === "awaiting_manager_approval" ? `<button type="button" class="btn" data-approve-agreement-id="${row.id}">Approve & Activate Booking</button>` : ""}
+          ${row.draft_pdf_url ? `<a class="btn alt" href="${row.draft_pdf_url}" target="_blank" rel="noopener noreferrer">Draft PDF</a>` : ""}
+          ${row.signed_pdf_url ? `<a class="btn" href="${row.signed_pdf_url}" target="_blank" rel="noopener noreferrer">Signed PDF</a>` : ""}
+          ${row.signed_pdf_url ? `<button type="button" class="btn alt" data-print-pdf-url="${row.signed_pdf_url}">Print</button>` : ""}
+        </div>
+      </article>
+    `)
+    .join("");
+}
+
+function agreementStatusLabel(status) {
+  if (status === "awaiting_manager_approval") return "Awaiting Manager Approval";
+  if (status === "pending_signature") return "Pending Signature";
+  if (status === "sent") return "Sent";
+  if (status === "viewed") return "Viewed";
+  if (status === "approved") return "Approved";
+  if (status === "completed") return "Completed";
+  if (status === "declined") return "Declined";
+  if (status === "expired") return "Expired";
+  if (status === "voided") return "Voided";
+  if (status === "canceled") return "Canceled";
+  return status;
+}
+
+async function approveAgreementAndActivateBooking(agreementId) {
+  const agreement = agreementRecords.find((row) => Number(row.id) === Number(agreementId));
+  if (!agreement) {
+    setMessage(formsMessage, "Agreement record not found.", true);
+    return;
+  }
+  const confirmed = window.confirm("Approve this agreement and activate the booking?");
+  if (!confirmed) return;
+
+  const updateAgreementResult = await supabase
+    .from("booking_agreements")
+    .update({ agreement_status: "approved", completed_at: new Date().toISOString() })
+    .eq("id", agreementId);
+  if (updateAgreementResult.error) {
+    setMessage(formsMessage, `Unable to approve agreement: ${updateAgreementResult.error.message}`, true);
+    return;
+  }
+
+  const updateReservationResult = await supabase
+    .from("booking_reservations")
+    .update({ status: "booked" })
+    .eq("id", agreement.reservation_id);
+  if (updateReservationResult.error) {
+    setMessage(formsMessage, `Agreement approved, but booking activation failed: ${updateReservationResult.error.message}`, true);
+    return;
+  }
+
+  const dateKey = String(agreement.reservation_date || "");
+  if (dateKey) {
+    const recalcResult = await rebuildAvailabilityForDate(dateKey);
+    if (recalcResult?.error) {
+      setMessage(formsMessage, `Agreement approved, but availability rebuild failed: ${recalcResult.error}`, true);
+      return;
+    }
+    await refreshCalendar(dateKey);
+  } else {
+    await refreshCalendar(selectedKey);
+  }
+
+  setMessage(formsMessage, "Agreement approved and booking activated.");
+  await refreshFormsData();
+}
+
+async function saveAgreementTemplate() {
+  const name = cleanText(templateNameInput?.value);
+  const file = templateFileInput?.files?.[0];
+  if (!name || !file) {
+    setMessage(formsMessage, "Template name and PDF file are required.", true);
+    return;
+  }
+
+  const bucket = (import.meta.env.VITE_SUPABASE_AGREEMENTS_BUCKET || "rental-agreements").trim();
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `templates/${Date.now()}_${safeName}`;
+  const uploadResult = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+  if (uploadResult.error) {
+    setMessage(formsMessage, `Template upload failed: ${uploadResult.error.message}`, true);
+    return;
+  }
+
+  const publicResult = supabase.storage.from(bucket).getPublicUrl(path);
+  const insertResult = await supabase
+    .from("agreement_templates")
+    .insert({
+      name,
+      storage_path: path,
+      file_url: publicResult.data?.publicUrl || "",
+      is_active: true,
+    });
+  if (insertResult.error) {
+    setMessage(formsMessage, `Template save failed: ${insertResult.error.message}`, true);
+    return;
+  }
+
+  if (templateNameInput) templateNameInput.value = "";
+  if (templateFileInput) templateFileInput.value = "";
+  setMessage(formsMessage, "Template saved.");
+  await refreshFormsData();
+}
+
+async function deleteAgreementTemplate(templateId) {
+  const template = agreementTemplates.find((row) => Number(row.id) === Number(templateId));
+  if (!template) {
+    setMessage(formsMessage, "Template not found.", true);
+    return;
+  }
+  const confirmed = window.confirm(`Delete template "${template.name || template.id}"?`);
+  if (!confirmed) return;
+
+  const bucket = (import.meta.env.VITE_SUPABASE_AGREEMENTS_BUCKET || "rental-agreements").trim();
+  if (template.storage_path) {
+    await supabase.storage.from(bucket).remove([template.storage_path]);
+  }
+  const result = await supabase.from("agreement_templates").delete().eq("id", templateId);
+  if (result.error) {
+    setMessage(formsMessage, `Delete failed: ${result.error.message}`, true);
+    return;
+  }
+  setMessage(formsMessage, "Template deleted.");
+  await refreshFormsData();
+}
+
+async function openTemplateDesigner(templateId) {
+  const template = agreementTemplates.find((row) => Number(row.id) === Number(templateId));
+  if (!template) {
+    setMessage(formsMessage, "Template not found.", true);
+    return;
+  }
+  activeTemplateDesignId = Number(template.id);
+  activeTemplatePage = 1;
+  activeFieldSelectionId = "";
+  if (fieldSignerRoleInput) fieldSignerRoleInput.value = "renter";
+  templateDesignerModal?.querySelectorAll("[data-role-select]").forEach((node) => {
+    node.classList.toggle("is-active", node.getAttribute("data-role-select") === "renter");
+  });
+  activeTemplateDesignFields = await loadTemplateFieldLayout(activeTemplateDesignId);
+  await loadTemplatePdf(template.file_url);
+  await renderTemplateCanvasPage(activeTemplatePage);
+  await renderTemplatePageThumbs();
+  renderTemplateFieldOverlay();
+  templateDesignerModal?.classList.remove("hidden");
+  templateDesignerModal?.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+}
+
+function closeTemplateDesigner() {
+  templateDesignerModal?.classList.add("hidden");
+  templateDesignerModal?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+  setMessage(templateDesignerMessage, "");
+  activeFieldSelectionId = "";
+}
+
+async function loadTemplatePdf(url) {
+  if (!url) {
+    activeTemplatePdf = null;
+    return;
+  }
+  const loadingTask = getDocument(url);
+  activeTemplatePdf = await loadingTask.promise;
+}
+
+async function renderTemplateCanvasPage(pageNumber) {
+  if (!(templateCanvas instanceof HTMLCanvasElement)) return;
+  const ctx = templateCanvas.getContext("2d");
+  if (!ctx) return;
+  if (!activeTemplatePdf) {
+    ctx.clearRect(0, 0, templateCanvas.width, templateCanvas.height);
+    return;
+  }
+  try {
+    const safePage = Math.max(1, Math.min(pageNumber, activeTemplatePdf.numPages));
+    activeTemplatePage = safePage;
+    const page = await activeTemplatePdf.getPage(safePage);
+    const viewport = page.getViewport({ scale: 1.2 });
+    templateCanvas.width = Math.floor(viewport.width);
+    templateCanvas.height = Math.floor(viewport.height);
+    activeTemplateCanvasSize = { width: templateCanvas.width, height: templateCanvas.height };
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    syncTemplateOverlaySize();
+  } catch (error) {
+    setMessage(templateDesignerMessage, `Unable to render PDF preview: ${String(error?.message || error)}`, true);
+  }
+}
+
+async function renderTemplatePageThumbs() {
+  if (!(pageThumbsNode instanceof HTMLElement)) return;
+  pageThumbsNode.innerHTML = "";
+  if (!activeTemplatePdf) return;
+  const maxThumbs = Math.min(activeTemplatePdf.numPages, 8);
+  for (let pageNumber = 1; pageNumber <= maxThumbs; pageNumber += 1) {
+    const canvas = document.createElement("canvas");
+    canvas.className = `manager-page-thumb${pageNumber === activeTemplatePage ? " is-active" : ""}`;
+    canvas.dataset.pageNumber = String(pageNumber);
+    const page = await activeTemplatePdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 0.25 });
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    const ctx = canvas.getContext("2d");
+    if (ctx) await page.render({ canvasContext: ctx, viewport }).promise;
+    canvas.addEventListener("click", async () => {
+      activeTemplatePage = pageNumber;
+      await renderTemplateCanvasPage(pageNumber);
+      await renderTemplatePageThumbs();
+      renderTemplateFieldOverlay();
+    });
+    pageThumbsNode.append(canvas);
+  }
+}
+
+function syncTemplateOverlaySize() {
+  if (!(templateCanvas instanceof HTMLCanvasElement) || !(templateOverlay instanceof HTMLElement)) return;
+  const toolbarHeight = templateCanvas.previousElementSibling instanceof HTMLElement ? templateCanvas.previousElementSibling.offsetHeight : 0;
+  templateOverlay.style.width = `${templateCanvas.clientWidth}px`;
+  templateOverlay.style.height = `${templateCanvas.clientHeight}px`;
+  templateOverlay.style.top = `${toolbarHeight}px`;
+}
+
+async function loadTemplateFieldLayout(templateId) {
+  const result = await supabase
+    .from("agreement_template_fields")
+    .select("id, template_id, field_key, field_type, signer_role, is_required, autofill_source, page_number, x, y, width, height, sort_order")
+    .eq("template_id", templateId)
+    .order("sort_order", { ascending: true });
+  if (result.error) {
+    setMessage(templateDesignerMessage, `Unable to load field layout: ${result.error.message}`, true);
+    return [];
+  }
+  return Array.isArray(result.data) ? result.data : [];
+}
+
+function addTemplateFieldBlock() {
+  if (!activeTemplateDesignId) return;
+  const fieldKey = cleanText(fieldKeyInput?.value) || `field_${Date.now()}`;
+  const fieldType = normalizeWidgetType(activeWidgetType);
+  const signerRole = cleanText(fieldSignerRoleInput?.value) || "renter";
+  const autofillSource = cleanText(fieldAutofillSourceInput?.value);
+  const isRequired = Boolean(fieldRequiredInput?.checked);
+  const nextOrder = activeTemplateDesignFields.length + 1;
+  const pageCount = activeTemplateDesignFields.filter((field) => Number(field.page_number || 1) === activeTemplatePage).length;
+  const offset = (pageCount % 8) * 16;
+  activeTemplateDesignFields.push({
+    id: `new_${Date.now()}_${Math.random()}`,
+    template_id: activeTemplateDesignId,
+    field_key: fieldKey,
+    field_type: fieldType,
+    signer_role: signerRole,
+    is_required: isRequired,
+    autofill_source: autofillSource,
+    page_number: activeTemplatePage,
+    x: 40 + offset,
+    y: 40 + offset,
+    width: fieldType === "signature" || fieldType === "initial" ? 180 : fieldType === "checkbox" ? 28 : 240,
+    height: fieldType === "signature" || fieldType === "initial" ? 60 : fieldType === "checkbox" ? 28 : 34,
+    sort_order: nextOrder,
+  });
+  activeFieldSelectionId = String(activeTemplateDesignFields[activeTemplateDesignFields.length - 1].id);
+  renderTemplateFieldOverlay();
+  syncFieldInputsFromSelection();
+}
+
+function renderTemplateFieldOverlay() {
+  if (!(templateOverlay instanceof HTMLElement) || !(templateFieldItems instanceof HTMLElement)) return;
+  syncTemplateOverlaySize();
+  templateOverlay.innerHTML = "";
+
+  activeTemplateDesignFields.filter((field) => Number(field.page_number || 1) === activeTemplatePage).forEach((field) => {
+    const block = document.createElement("div");
+    block.className = `manager-template-field-block${field.field_type === "signature" || field.field_type === "initial" ? " is-signature" : ""}`;
+    block.setAttribute("data-field-id", String(field.id));
+    if (String(field.id) === activeFieldSelectionId) block.classList.add("is-selected");
+    block.style.left = `${Number(field.x)}px`;
+    block.style.top = `${Number(field.y)}px`;
+    block.style.width = `${Number(field.width)}px`;
+    block.style.height = `${Number(field.height)}px`;
+    const label = document.createElement("span");
+    label.className = "manager-field-label";
+    label.textContent = `${humanizeFieldKey(field.field_key)} - ${humanizeAutofill(field.autofill_source)}`;
+    block.append(label);
+    block.addEventListener("click", (event) => {
+      event.stopPropagation();
+      activeFieldSelectionId = String(field.id);
+      syncFieldInputsFromSelection();
+      renderTemplateFieldOverlay();
+    });
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "manager-field-remove-btn";
+    removeButton.textContent = "x";
+    removeButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteTemplateFieldById(String(field.id));
+    });
+    block.append(removeButton);
+    if (String(field.id) === activeFieldSelectionId) {
+      const resizeHandle = document.createElement("div");
+      resizeHandle.className = "manager-field-resize-handle";
+      resizeHandle.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+        startResizeFieldBlock(event, block, field);
+      });
+      block.append(resizeHandle);
+    }
+    makeDraggableFieldBlock(block);
+    templateOverlay.append(block);
+  });
+
+  templateOverlay.onclick = () => {
+    activeFieldSelectionId = "";
+    syncFieldInputsFromSelection();
+    renderTemplateFieldOverlay();
+  };
+
+  templateFieldItems.innerHTML = activeTemplateDesignFields
+    .map((field) => `
+      <article class="manager-list-card">
+        <p><strong>${escapeHtml(field.field_key)}</strong> (${escapeHtml(field.field_type)})</p>
+        <p class="muted">Page: ${escapeHtml(String(field.page_number || 1))}</p>
+        <p class="muted">Role: ${escapeHtml(field.signer_role)} | Required: ${field.is_required ? "Yes" : "No"}</p>
+        <p class="muted">Autofill: ${escapeHtml(field.autofill_source || "Manual")}</p>
+        <div class="manager-list-actions">
+          <button type="button" class="btn alt" data-field-delete-id="${escapeHtml(String(field.id))}">Delete</button>
+        </div>
+      </article>
+    `)
+    .join("");
+
+  templateFieldItems.querySelectorAll("[data-field-delete-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = String(button.getAttribute("data-field-delete-id") || "");
+      deleteTemplateFieldById(id);
+    });
+  });
+}
+
+function deleteTemplateFieldById(fieldId) {
+  if (!fieldId) return;
+  activeTemplateDesignFields = activeTemplateDesignFields.filter((field) => String(field.id) !== String(fieldId));
+  if (activeFieldSelectionId === String(fieldId)) activeFieldSelectionId = "";
+  renderTemplateFieldOverlay();
+  syncFieldInputsFromSelection();
+}
+
+function syncFieldInputsFromSelection() {
+  const selected = activeTemplateDesignFields.find((field) => String(field.id) === String(activeFieldSelectionId));
+  if (!selected) {
+    if (fieldKeyInput) fieldKeyInput.value = "";
+    if (fieldAutofillSourceInput) fieldAutofillSourceInput.value = "";
+    if (fieldSignerRoleInput) fieldSignerRoleInput.value = "renter";
+    if (fieldRequiredInput) fieldRequiredInput.checked = true;
+    return;
+  }
+  if (fieldKeyInput) fieldKeyInput.value = String(selected.field_key || "");
+  if (fieldAutofillSourceInput) fieldAutofillSourceInput.value = String(selected.autofill_source || "");
+  if (fieldSignerRoleInput) fieldSignerRoleInput.value = String(selected.signer_role || "renter");
+  if (fieldRequiredInput) fieldRequiredInput.checked = Boolean(selected.is_required);
+}
+
+function updateSelectedFieldFromInputs() {
+  const selected = activeTemplateDesignFields.find((field) => String(field.id) === String(activeFieldSelectionId));
+  if (!selected) return;
+  selected.field_key = cleanText(fieldKeyInput?.value) || selected.field_key;
+  selected.autofill_source = cleanText(fieldAutofillSourceInput?.value);
+  selected.signer_role = cleanText(fieldSignerRoleInput?.value) || "renter";
+  selected.is_required = Boolean(fieldRequiredInput?.checked);
+  renderTemplateFieldOverlay();
+}
+
+function startResizeFieldBlock(pointerEvent, block, field) {
+  const startX = pointerEvent.clientX;
+  const startY = pointerEvent.clientY;
+  const startWidth = Number(field.width) || block.offsetWidth;
+  const startHeight = Number(field.height) || block.offsetHeight;
+  const pointerId = pointerEvent.pointerId;
+  block.setPointerCapture(pointerId);
+  const moveHandler = (event) => {
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    field.width = Math.max(20, Math.round(startWidth + dx));
+    field.height = Math.max(20, Math.round(startHeight + dy));
+    block.style.width = `${field.width}px`;
+    block.style.height = `${field.height}px`;
+  };
+  const upHandler = () => {
+    block.removeEventListener("pointermove", moveHandler);
+    block.removeEventListener("pointerup", upHandler);
+    block.removeEventListener("pointercancel", upHandler);
+    renderTemplateFieldOverlay();
+  };
+  block.addEventListener("pointermove", moveHandler);
+  block.addEventListener("pointerup", upHandler);
+  block.addEventListener("pointercancel", upHandler);
+}
+
+function makeDraggableFieldBlock(block) {
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+  block.addEventListener("pointerdown", (event) => {
+    dragging = true;
+    const rect = block.getBoundingClientRect();
+    offsetX = event.clientX - rect.left;
+    offsetY = event.clientY - rect.top;
+    block.setPointerCapture(event.pointerId);
+  });
+  block.addEventListener("pointermove", (event) => {
+    if (!dragging || !(templateOverlay instanceof HTMLElement)) return;
+    const overlayRect = templateOverlay.getBoundingClientRect();
+    const x = Math.max(0, Math.min(event.clientX - overlayRect.left - offsetX, overlayRect.width - block.offsetWidth));
+    const y = Math.max(0, Math.min(event.clientY - overlayRect.top - offsetY, overlayRect.height - block.offsetHeight));
+    block.style.left = `${x}px`;
+    block.style.top = `${y}px`;
+    const fieldId = String(block.getAttribute("data-field-id") || "");
+    const target = activeTemplateDesignFields.find((field) => String(field.id) === fieldId);
+    if (target) {
+      target.x = Math.round(x);
+      target.y = Math.round(y);
+    }
+  });
+  block.addEventListener("pointerup", () => {
+    dragging = false;
+  });
+}
+
+async function saveTemplateFieldLayout() {
+  if (!activeTemplateDesignId) return;
+  const deleteResult = await supabase.from("agreement_template_fields").delete().eq("template_id", activeTemplateDesignId);
+  if (deleteResult.error) {
+    setMessage(templateDesignerMessage, `Save failed: ${deleteResult.error.message}`, true);
+    return;
+  }
+
+  const rows = activeTemplateDesignFields.map((field, index) => ({
+    template_id: activeTemplateDesignId,
+    field_key: String(field.field_key || "").trim().toLowerCase(),
+    field_type: String(field.field_type || "text").trim().toLowerCase(),
+    signer_role: String(field.signer_role || "renter").trim().toLowerCase(),
+    is_required: Boolean(field.is_required),
+    autofill_source: cleanText(field.autofill_source),
+    page_number: Number(field.page_number) || 1,
+    x: Number(field.x) || 0,
+    y: Number(field.y) || 0,
+    width: Number(field.width) || 180,
+    height: Number(field.height) || 34,
+    sort_order: index + 1,
+  }));
+  if (!rows.length) {
+    setMessage(templateDesignerMessage, "Layout saved (no fields).");
+    return;
+  }
+  const insertResult = await supabase.from("agreement_template_fields").insert(rows);
+  if (insertResult.error) {
+    setMessage(templateDesignerMessage, `Save failed: ${insertResult.error.message}`, true);
+    return;
+  }
+  setMessage(templateDesignerMessage, "Field layout saved.");
+  activeTemplateDesignFields = await loadTemplateFieldLayout(activeTemplateDesignId);
+  renderTemplateFieldOverlay();
+}
+
+async function createAgreementForReservation(reservation, templateId) {
+  const template = agreementTemplates.find((row) => Number(row.id) === Number(templateId));
+  if (!template) return { error: "Selected template no longer exists." };
+
+  const insertResult = await supabase
+    .from("booking_agreements")
+    .insert({
+      reservation_id: reservation.id,
+      reservation_date: reservation.date,
+      template_id: template.id,
+      template_name: template.name,
+      renter_name: reservation.renter_name,
+      renter_email: reservation.renter_email,
+      renter_phone: reservation.renter_phone,
+      event_type: reservation.event_type,
+      agreement_status: "sent",
+      draft_pdf_url: template.file_url,
+    })
+    .select("id")
+    .single();
+
+  if (insertResult.error) return { error: insertResult.error.message };
+
+  const dispatchResult = await dispatchAgreementToOpenSign({
+    agreementId: insertResult.data.id,
+    reservation,
+    template,
+    notifyEmail: agreementSettings?.notify_email || null,
+    venueSignerEmail: agreementSettings?.venue_signer_email || null,
+  });
+  if (dispatchResult.error) return { error: dispatchResult.error };
+
+  await refreshFormsData();
+  return { error: null };
+}
+
+async function dispatchAgreementToOpenSign({ agreementId, reservation, template, notifyEmail, venueSignerEmail }) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+  const edgeFnName = (import.meta.env.VITE_OPENSIGN_DISPATCH_FUNCTION || "opensign-dispatch").trim();
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return { error: "Missing Supabase env values." };
+  }
+
+  const sessionResult = await supabase.auth.getSession();
+  const accessToken = sessionResult?.data?.session?.access_token || "";
+  if (!accessToken) return { error: "Manager session missing access token." };
+
+  const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/functions/v1/${edgeFnName}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      agreement_id: agreementId,
+      reservation,
+      template,
+      notify_email: notifyEmail,
+      venue_signer_email: venueSignerEmail,
+      approval_required: true,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return { error: payload?.error || `Dispatch failed (${response.status}).` };
+  }
+
+  const updatePayload = {
+    opensign_document_id: payload?.opensign_document_id || null,
+    agreement_status: payload?.agreement_status || "sent",
+    opensign_draft_url: payload?.opensign_draft_url || null,
+    draft_pdf_url: payload?.draft_pdf_url || template.file_url || null,
+    signed_pdf_url: payload?.signed_pdf_url || null,
+  };
+  const updateResult = await supabase.from("booking_agreements").update(updatePayload).eq("id", agreementId);
+  if (updateResult.error) return { error: updateResult.error.message };
+  return { error: null };
 }
 
 function renderSlotReservationPanel(dateKey, slot) {
@@ -791,22 +1653,47 @@ function renderSlotReservationPanel(dateKey, slot) {
           const agreementLink = row.rental_agreement_url
             ? `<a href="${row.rental_agreement_url}" target="_blank" rel="noopener noreferrer">Open Agreement</a>`
             : "No agreement uploaded";
+          const rowStatus = normalizeStatus(row.status) || "booked";
+          const isPending = rowStatus === "pending";
           return `
             <div class="manager-slot-record">
               <details>
                 <summary>${escapeHtml(row.renter_name || "Unknown")} | ${escapeHtml(slotLabel(row.booking_type, row.start_hour, row.end_hour))}</summary>
+                <p class="muted">Status: ${escapeHtml(toLabel(rowStatus))}</p>
+                <p class="muted">Added: ${escapeHtml(formatDateTimeLabel(row.created_at))}</p>
                 <p class="muted">Email: ${escapeHtml(row.renter_email || "Not set")}</p>
                 <p class="muted">Phone: ${escapeHtml(row.renter_phone || "Not provided")}</p>
                 <p class="muted">Event: ${escapeHtml(row.event_type || "Not set")}</p>
                 <p class="muted">Payment: ${escapeHtml(paymentLabel(row.payment_status))}</p>
                 <p class="muted">Agreement: ${agreementLink}</p>
                 <button type="button" class="btn alt" data-load-reservation-id="${row.id}">Load Full Customer Card</button>
+                ${isPending ? `<button type="button" class="btn" data-set-reservation-status="${row.id}" data-next-status="booked">Confirm (Move To Booked)</button>` : ""}
+                ${rowStatus === "booked" || rowStatus === "tentative" ? `<button type="button" class="btn alt" data-set-reservation-status="${row.id}" data-next-status="pending">Move Back To Pending</button>` : ""}
                 <button type="button" class="btn alt" data-delete-reservation-id="${row.id}">Delete Booking</button>
               </details>
             </div>
           `;
         })
         .join("");
+
+      const pendingQueue = reservations
+        .filter((row) => normalizeStatus(row.status) === "pending")
+        .sort((a, b) => {
+          const aTime = Date.parse(String(a.created_at || "")) || Number(a.id) || 0;
+          const bTime = Date.parse(String(b.created_at || "")) || Number(b.id) || 0;
+          return aTime - bTime;
+        });
+      if (pendingQueue.length) {
+        const queueHtml = pendingQueue
+          .map((row, index) => `<li>#${index + 1}: ${escapeHtml(row.renter_name || "Unknown")} (${escapeHtml(formatDateTimeLabel(row.created_at))})</li>`)
+          .join("");
+        detailHtml += `
+          <div class="manager-slot-record">
+            <p><strong>Pending Queue (First Come, First Serve)</strong></p>
+            <ol>${queueHtml}</ol>
+          </div>
+        `;
+      }
     }
   }
 
@@ -971,6 +1858,7 @@ function loadReservationIntoEditor(reservationId) {
   if (renterPhoneInput) renterPhoneInput.value = record.renter_phone || "";
   if (eventTypeInput) eventTypeInput.value = record.event_type || "";
   if (paymentStatusInput) paymentStatusInput.value = normalizePaymentStatus(record.payment_status) || "";
+  if (reservationStatusInput) reservationStatusInput.value = normalizeStatus(record.status) || "booked";
   if (agreementUrlInput) agreementUrlInput.value = record.rental_agreement_url || "";
   if (agreementFileInput) agreementFileInput.value = "";
   if (reservationDateInput) reservationDateInput.value = String(record.date || selectedKey);
@@ -1014,6 +1902,37 @@ async function deleteReservationById(reservationId) {
   await refreshCalendar(bookingDate);
 }
 
+async function updateReservationStatusById(reservationId, nextStatusRaw) {
+  const nextStatus = normalizeStatus(nextStatusRaw);
+  if (!nextStatus || (nextStatus !== "pending" && nextStatus !== "booked" && nextStatus !== "tentative")) {
+    setMessage(saveMessage, "Invalid status update requested.", true);
+    return;
+  }
+
+  const rows = reservationData[selectedKey] || [];
+  const record = rows.find((row) => Number(row.id) === Number(reservationId));
+  if (!record) {
+    setMessage(saveMessage, "Reservation record not found.", true);
+    return;
+  }
+
+  const { error } = await supabase.from("booking_reservations").update({ status: nextStatus }).eq("id", reservationId);
+  if (error) {
+    setMessage(saveMessage, `Status update failed: ${error.message}`, true);
+    return;
+  }
+
+  const bookingDate = String(record.date || selectedKey);
+  const recalcResult = await rebuildAvailabilityForDate(bookingDate);
+  if (recalcResult?.error) {
+    setMessage(saveMessage, `Status updated, but availability rebuild failed: ${recalcResult.error}`, true);
+    return;
+  }
+
+  setMessage(saveMessage, `Reservation status set to ${toLabel(nextStatus)}.`);
+  await refreshCalendar(bookingDate);
+}
+
 function openBookingModalForSlot(slot) {
   resetBookingModalFields();
   if (reservationDateInput) reservationDateInput.value = selectedKey;
@@ -1033,6 +1952,13 @@ async function saveReservationForSelectedDate() {
   const renterEmail = cleanText(renterEmailInput?.value);
   const slot = cleanText(reservationSlotInput?.value);
   const paymentStatus = normalizePaymentStatus(paymentStatusInput?.value);
+  const selectedTemplateId = Number(templateSelectInput?.value || 0);
+  if (!selectedTemplateId) {
+    setMessage(saveMessage, "Select a saved agreement template before saving the booking.", true);
+    return;
+  }
+  let reservationStatus = normalizeStatus(reservationStatusInput?.value) || "booked";
+  reservationStatus = "pending";
 
   if (!slot) {
     setMessage(saveMessage, "Choose a booking slot for this reservation.", true);
@@ -1049,13 +1975,6 @@ async function saveReservationForSelectedDate() {
     return;
   }
 
-  const agreementUrl = await resolveAgreementUrl(bookingDate);
-  if (agreementUrl.error) {
-    setMessage(saveMessage, agreementUrl.error, true);
-    updateSaveButtonState(false);
-    return;
-  }
-
   updateSaveButtonState(false, true);
 
   const payload = {
@@ -1063,18 +1982,20 @@ async function saveReservationForSelectedDate() {
     booking_type: slotRange.bookingType,
     start_hour: slotRange.start,
     end_hour: slotRange.end,
-    status: "booked",
+    status: reservationStatus,
     renter_name: renterName,
     renter_email: renterEmail,
     renter_phone: cleanText(renterPhoneInput?.value),
     event_type: cleanText(eventTypeInput?.value),
     payment_status: paymentStatus || "needs_payment",
-    rental_agreement_url: agreementUrl.value,
+    rental_agreement_url: null,
   };
 
-  const { error } = await supabase
+  const { data: savedReservation, error } = await supabase
     .from("booking_reservations")
-    .upsert(payload, { onConflict: "date,start_hour,end_hour" });
+    .upsert(payload, { onConflict: "date,start_hour,end_hour" })
+    .select("id, date, booking_type, start_hour, end_hour, status, renter_name, renter_email, renter_phone, event_type")
+    .single();
 
   if (error) {
     setMessage(saveMessage, `Reservation save failed: ${error.message}`, true);
@@ -1082,11 +2003,22 @@ async function saveReservationForSelectedDate() {
     return;
   }
 
-  const availabilityResult = await applyReservationToAvailability(bookingDate, slotRange);
-  if (availabilityResult?.error) {
-    setMessage(saveMessage, `Saved reservation, but calendar update failed: ${availabilityResult.error}`, true);
-    updateSaveButtonState(false);
-    return;
+  if (reservationStatus !== "pending") {
+    const availabilityResult = await applyReservationToAvailability(bookingDate, slotRange);
+    if (availabilityResult?.error) {
+      setMessage(saveMessage, `Saved reservation, but calendar update failed: ${availabilityResult.error}`, true);
+      updateSaveButtonState(false);
+      return;
+    }
+  }
+
+  if (savedReservation?.id) {
+    const agreementResult = await createAgreementForReservation(savedReservation, selectedTemplateId);
+    if (agreementResult?.error) {
+      setMessage(saveMessage, `Booking saved, but agreement setup failed: ${agreementResult.error}`, true);
+      updateSaveButtonState(false);
+      return;
+    }
   }
   selectedKey = bookingDate;
   setMessage(saveMessage, "Reservation details saved.");
@@ -1104,6 +2036,7 @@ function disableForms() {
 function toLabel(status) {
   if (status === "booked") return "Booked";
   if (status === "tentative") return "Tentative";
+  if (status === "pending") return "Pending";
   if (status === "unavailable") return "Unavailable";
   return "Available";
 }
@@ -1123,6 +2056,38 @@ function slotLabel(type, startHour, endHour) {
     return `${formatHour(startHour)}-${formatHour(endHour)}`;
   }
   return "Custom Slot";
+}
+
+function normalizeWidgetType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "number") return "number";
+  if (normalized === "name") return "name";
+  if (normalized === "checkbox") return "checkbox";
+  if (normalized === "dropdown") return "dropdown";
+  if (normalized === "signature") return "signature";
+  if (normalized === "initial") return "initial";
+  if (normalized === "email") return "email";
+  if (normalized === "phone") return "phone";
+  if (normalized === "date") return "date";
+  return "text";
+}
+
+function humanizeFieldKey(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "Field";
+  return raw.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function humanizeAutofill(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "Manual";
+  if (raw === "renter_name") return "Auto: Renter Name";
+  if (raw === "renter_email") return "Auto: Renter Email";
+  if (raw === "renter_phone") return "Auto: Renter Phone";
+  if (raw === "event_type") return "Auto: Event Type";
+  if (raw === "reservation_date") return "Auto: Reservation Date";
+  if (raw === "slot_label") return "Auto: Booking Slot";
+  return `Auto: ${raw}`;
 }
 
 function toDateKey(date) {
@@ -1183,6 +2148,13 @@ function cleanText(value) {
   return trimmed ? trimmed : null;
 }
 
+function formatDateTimeLabel(value) {
+  if (!value) return "Unknown";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return date.toLocaleString();
+}
+
 function normalizePaymentStatus(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "paid_in_full" || normalized === "paid_down_payment" || normalized === "needs_payment") {
@@ -1229,8 +2201,10 @@ function resetBookingModalFields() {
   if (renterPhoneInput) renterPhoneInput.value = "";
   if (eventTypeInput) eventTypeInput.value = "";
   if (paymentStatusInput) paymentStatusInput.value = "";
+  if (reservationStatusInput) reservationStatusInput.value = "booked";
   if (agreementUrlInput) agreementUrlInput.value = "";
   if (agreementFileInput) agreementFileInput.value = "";
+  if (templateSelectInput) templateSelectInput.value = "";
   updateSaveButtonState(false);
   updateCustomTimeVisibility();
 }
@@ -1358,7 +2332,11 @@ async function rebuildAvailabilityForDate(date) {
     .select("id, date, booking_type, start_hour, end_hour, status")
     .eq("date", date);
   if (reservationQuery.error) return { error: reservationQuery.error.message };
-  const reservations = Array.isArray(reservationQuery.data) ? reservationQuery.data : [];
+  const reservations = (Array.isArray(reservationQuery.data) ? reservationQuery.data : [])
+    .filter((row) => {
+      const status = normalizeStatus(row.status) || "booked";
+      return status === "booked" || status === "tentative";
+    });
 
   const selectFields = bookingReasonColumnsAvailable
     ? "date, full_day, half_morning, half_evening, hourly_slots, full_day_reason, half_morning_reason, half_evening_reason"

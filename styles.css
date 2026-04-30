@@ -488,6 +488,215 @@ body.modal-open {
 .manager-message.is-error {
   color: #9a2f25;
 }
+.manager-view-tabs {
+  margin-top: 1rem;
+}
+.manager-forms {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+.manager-forms-subtabs {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.manager-template-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.8rem;
+  align-items: end;
+}
+.manager-list {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.6rem;
+}
+.manager-list-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.8rem;
+}
+.manager-list-actions {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.manager-template-designer-dialog {
+  width: min(1280px, 96vw);
+}
+.manager-template-designer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: end;
+  margin-bottom: 0.8rem;
+}
+.manager-template-designer-grid {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  gap: 1rem;
+}
+.manager-template-pages {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.7rem;
+  max-height: 70vh;
+  overflow: auto;
+}
+.manager-template-page-thumbs {
+  display: grid;
+  gap: 0.7rem;
+}
+.manager-page-thumb {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  background: #fafafa;
+}
+.manager-page-thumb.is-active {
+  outline: 2px solid #1f6f52;
+}
+.manager-template-stage-wrap {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  overflow: auto;
+  max-height: 70vh;
+}
+#manager-template-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.manager-template-stage-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  padding: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: end;
+}
+.manager-selected-field-title {
+  margin: 0;
+  width: 100%;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0a3570;
+}
+.manager-template-overlay {
+  position: absolute;
+  left: 0;
+  top: 48px;
+}
+.manager-template-field-block {
+  position: absolute;
+  border: 2px solid #1f6f52;
+  background: rgba(31, 111, 82, 0.12);
+  border-radius: 6px;
+  padding: 0.2rem;
+  font-size: 0.72rem;
+  cursor: move;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+.manager-template-field-block.is-selected {
+  box-shadow: 0 0 0 3px rgba(10, 53, 112, 0.35);
+}
+.manager-template-field-block.is-signature {
+  border-color: #8a4b20;
+  background: rgba(138, 75, 32, 0.12);
+}
+.manager-field-remove-btn {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid #7a1d1d;
+  background: #fff;
+  color: #7a1d1d;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+.manager-field-label {
+  display: block;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  color: #16302d;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.1rem 0.2rem;
+  border-radius: 4px;
+  max-width: calc(100% - 22px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.manager-field-resize-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  right: -1px;
+  bottom: -1px;
+  background: #0a3570;
+  border-radius: 3px;
+  cursor: nwse-resize;
+}
+.manager-template-field-list {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.7rem;
+  background: #fff;
+  max-height: 70vh;
+  overflow: auto;
+}
+.opensign-style-sidebar .eyebrow {
+  margin-top: 0.5rem;
+}
+.manager-role-list {
+  display: grid;
+  gap: 0.5rem;
+}
+.role-pill {
+  justify-content: flex-start;
+}
+.role-pill.is-active {
+  background: #d7bdd0;
+  border-color: #d7bdd0;
+}
+.manager-widget-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+.widget-btn {
+  border: 1px solid #0a3570;
+  border-radius: 999px;
+  background: #fff;
+  color: #0a3570;
+  font-weight: 700;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  cursor: pointer;
+}
+.widget-btn.is-active {
+  background: #0a3570;
+  color: #fff;
+}
 .site-footer { border-top: 1px solid var(--line); padding: 2.1rem 0; }
 .footer-wrap { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 .footer-links { display: flex; gap: 1rem; color: var(--muted); font-size: 0.92rem; }
@@ -524,6 +733,9 @@ body.modal-open {
   .manager-contact-grid { grid-template-columns: 1fr; }
   .manager-custom-time-row { grid-template-columns: 1fr; }
   .manager-modal-date-row { grid-template-columns: 1fr; }
+  .manager-template-form { grid-template-columns: 1fr; }
+  .manager-template-designer-grid { grid-template-columns: 1fr; }
+  .manager-widget-grid { grid-template-columns: 1fr; }
   .calendar-controls { grid-template-columns: 1fr 1fr; }
   .booking-form .form-grid { grid-template-columns: 1fr; }
   .hero { min-height: 520px; padding: 4.2rem 0; }

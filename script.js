@@ -1,4 +1,4 @@
-const menuButton = document.querySelector(".menu-toggle");
+﻿const menuButton = document.querySelector(".menu-toggle");
 const nav = document.querySelector(".nav");
 const header = document.querySelector(".site-header");
 
@@ -415,5 +415,67 @@ if (bookingGrid && bookingMonth && bookingYear && bookingSelectedDate && booking
     } catch (_error) {
       return { ...defaultBookingData };
     }
+  }
+}
+
+const inquiryForm = document.querySelector("#inquiry-form");
+const inquiryMessage = document.querySelector("#inquiry-message");
+
+if (inquiryForm) {
+  inquiryForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = String(document.querySelector("#inquiry-name")?.value || "").trim();
+    const email = String(document.querySelector("#inquiry-email")?.value || "").trim();
+    const eventType = String(document.querySelector("#inquiry-event-type")?.value || "").trim();
+    const details = String(document.querySelector("#inquiry-details")?.value || "").trim();
+
+    if (!name || !email || !details) {
+      if (inquiryMessage) inquiryMessage.textContent = "Please complete name, email, and details.";
+      return;
+    }
+
+    const to = await loadInquiryNotifyEmail();
+    const subject = encodeURIComponent(`Venue 221 Inquiry - ${name}`);
+    const body = encodeURIComponent(
+      [
+        `Name: ${name}`,
+        `Email: ${email}`,
+        `Event Type: ${eventType || "Not provided"}`,
+        "",
+        "Inquiry Details:",
+        details,
+      ].join("\n")
+    );
+
+    window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+    if (inquiryMessage) inquiryMessage.textContent = "Opening your email app with your inquiry pre-filled.";
+  });
+}
+
+async function loadInquiryNotifyEmail() {
+  const fallbackEmail = "venue221cookeville@gmail.com";
+  const envSupabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+  const envSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+  const metaSupabaseUrl = document.querySelector('meta[name="supabase-url"]')?.getAttribute("content")?.trim();
+  const metaSupabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.getAttribute("content")?.trim();
+  const supabaseUrl = envSupabaseUrl || metaSupabaseUrl;
+  const supabaseAnonKey = envSupabaseAnonKey || metaSupabaseAnonKey;
+
+  if (!supabaseUrl || !supabaseAnonKey) return fallbackEmail;
+
+  const endpoint = `${supabaseUrl.replace(/\/$/, "")}/rest/v1/agreement_settings?select=notify_email&id=eq.1&limit=1`;
+  try {
+    const response = await fetch(endpoint, {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+      },
+    });
+    if (!response.ok) return fallbackEmail;
+    const rows = await response.json();
+    const email = String(rows?.[0]?.notify_email || "").trim();
+    return email || fallbackEmail;
+  } catch (_error) {
+    return fallbackEmail;
   }
 }

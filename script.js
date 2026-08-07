@@ -1,4 +1,4 @@
-﻿const menuButton = document.querySelector(".menu-toggle");
+const menuButton = document.querySelector(".menu-toggle");
 const nav = document.querySelector(".nav");
 const header = document.querySelector(".site-header");
 
@@ -435,7 +435,7 @@ if (inquiryForm) {
     }
 
     const to = await loadInquiryNotifyEmail();
-    const subject = encodeURIComponent(`Venue 221 Inquiry - ${name}`);
+    const subject = encodeURIComponent(`OnBroad Inquiry - ${name}`);
     const body = encodeURIComponent(
       [
         `Name: ${name}`,
@@ -453,7 +453,7 @@ if (inquiryForm) {
 }
 
 async function loadInquiryNotifyEmail() {
-  const fallbackEmail = "venue221cookeville@gmail.com";
+  const fallbackEmail = "onbroadcookeville@gmail.com";
   const envSupabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
   const envSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
   const metaSupabaseUrl = document.querySelector('meta[name="supabase-url"]')?.getAttribute("content")?.trim();

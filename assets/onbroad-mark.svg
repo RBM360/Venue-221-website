@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-labelledby="title desc">
+  <title id="title">OnBroad monogram</title>
+  <desc id="desc">OB monogram for OnBroad</desc>
+  <rect width="180" height="180" rx="90" fill="#fffdf9"/>
+  <circle cx="90" cy="90" r="80" fill="none" stroke="#d7cec1" stroke-width="3"/>
+  <g fill="#1c1c1a" font-family="Cormorant Garamond, Trajan Pro, Georgia, serif" font-weight="600">
+    <text x="78" y="92" text-anchor="middle" font-size="62">O</text>
+    <text x="102" y="118" text-anchor="middle" font-size="62">B</text>
+  </g>
+  <g stroke="#a67c45" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M62 130c17-15 39-15 56 0"/>
+    <path d="M82 124c-8-9-16-13-25-13"/>
+    <path d="M98 124c8-9 16-13 25-13"/>
+  </g>
+</svg>

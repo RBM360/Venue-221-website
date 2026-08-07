@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 220" role="img" aria-labelledby="title desc">
+  <title id="title">OnBroad</title>
+  <desc id="desc">OnBroad event center wordmark</desc>
+  <rect width="720" height="220" fill="none"/>
+  <g fill="#1c1c1a">
+    <text x="360" y="108" text-anchor="middle" font-family="Cormorant Garamond, Trajan Pro, Georgia, serif" font-size="72" font-weight="600" letter-spacing="18">ON BROAD</text>
+    <text x="360" y="158" text-anchor="middle" font-family="Manrope, Arial, sans-serif" font-size="15" font-weight="500" letter-spacing="7">A DOWNTOWN COOKEVILLE EVENT CENTER</text>
+  </g>
+  <g stroke="#a67c45" stroke-width="2" fill="none" stroke-linecap="round">
+    <path d="M205 133h104"/>
+    <path d="M411 133h104"/>
+    <path d="M360 126l7 7-7 7-7-7z" fill="#a67c45" stroke="none"/>
+  </g>
+</svg>

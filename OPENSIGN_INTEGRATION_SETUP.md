@@ -17,7 +17,7 @@ In local `.env`:
 
 For production later:
 
-- `VITE_OPENSIGN_BASE_URL=https://sign.venue221.net`
+- `VITE_OPENSIGN_BASE_URL=https://sign.onbroadcookeville.com`
 
 ## 3. Create Supabase Edge Function
 
@@ -48,11 +48,11 @@ Expected request body:
   },
   "template": {
     "id": 1,
-    "name": "Venue 221 Rental Agreement",
+    "name": "OnBroad Rental Agreement",
     "file_url": "https://..."
   },
-  "notify_email": "manager@venue221.net",
-  "venue_signer_email": "contracts@venue221.net",
+  "notify_email": "manager@onbroadcookeville.com",
+  "venue_signer_email": "contracts@onbroadcookeville.com",
   "approval_required": true
 }
 ```
@@ -82,7 +82,7 @@ Create another edge function (example: `opensign-webhook`) and configure OpenSig
 
 The manager UI changes are domain-agnostic. In production:
 
-- serve manager portal at `manager.venue221.net`
-- keep OpenSign at `sign.venue221.net`
+- serve manager portal at `manager.onbroadcookeville.com`
+- keep OpenSign at `sign.onbroadcookeville.com`
 
 Only env and reverse-proxy/DNS settings need to change.
